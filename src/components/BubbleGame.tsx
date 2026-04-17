@@ -93,7 +93,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     s.grid = grid;
     s.canvasW = w; s.canvasH = h; s.dpr = dpr;
     s.shooterX = w / 2;
-    s.shooterY = h - 80;
+    s.shooterY = h - 60;
     s.currentColor = pickShooterColor(grid, level);
     s.nextColor = pickShooterColor(grid, level);
     setBallColor(s.currentColor);
