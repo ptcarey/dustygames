@@ -408,18 +408,23 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     if (vy >= -0.05) vy = -0.05;
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 4;
-    ctx.setLineDash([8, 10]);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 8]);
+
+    // Cap the dotted guide length to roughly one third of the canvas height
+    const MAX_LEN = s.canvasH / 3;
+    let remaining = MAX_LEN;
 
     let segments = 0;
     const grid = s.grid!;
-    while (segments < 3 && y > 30) {
-      let tWall = Infinity, wall: "L" | "R" | null = null;
-      if (vx < 0) { tWall = (RADIUS - x) / vx; wall = "L"; }
-      else if (vx > 0) { tWall = (s.canvasW - RADIUS - x) / vx; wall = "R"; }
+    while (segments < 5 && remaining > 4 && y > 30) {
+      let tWall = Infinity;
+      if (vx < 0) tWall = (RADIUS - x) / vx;
+      else if (vx > 0) tWall = (s.canvasW - RADIUS - x) / vx;
       let tHit = Infinity;
       for (const b of grid.bubbles) {
-        const dx = b.x - x, dy = b.y - y;
+        const by = b.y + s.scrollY;
+        const dx = b.x - x, dy = by - y;
         const dot = dx * vx + dy * vy;
         if (dot <= 0) continue;
         const closest = Math.sqrt(Math.max(0, dx * dx + dy * dy - dot * dot));
@@ -429,17 +434,24 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
         }
       }
       const tCeil = (RADIUS + 8 - y) / vy;
-      const t = Math.min(tWall, tHit, tCeil);
+      let t = Math.min(tWall, tHit, tCeil);
+      const cappedByLen = t > remaining;
+      if (cappedByLen) t = remaining;
       const ex = x + vx * t, ey = y + vy * t;
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.setLineDash([8, 10]);
 
-      if (t === tHit || t === tCeil) break;
+      if (cappedByLen) break;
+      // End-cap dot only at terminal hits, not bounces
+      if (t === tHit || t === tCeil) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.setLineDash([6, 8]);
+        break;
+      }
+      remaining -= t;
       x = ex; y = ey;
-      vx = -vx;
+      vx = -vx; // wall bounce
       segments++;
     }
     ctx.restore();
