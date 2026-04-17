@@ -19,9 +19,9 @@ const DEFAULT: GameSave = {
 export function loadSave(): GameSave {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT };
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT, ...parsed };
+    const base = raw ? { ...DEFAULT, ...JSON.parse(raw) } : { ...DEFAULT };
+    if (DEV_UNLOCK_ALL) base.unlockedLevel = Math.max(base.unlockedLevel, TOTAL_LEVELS);
+    return base;
   } catch {
     return { ...DEFAULT };
   }
