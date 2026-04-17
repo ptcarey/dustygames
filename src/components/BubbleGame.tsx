@@ -264,6 +264,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const s = stateRef.current;
     s.currentColor = s.nextColor;
     s.nextColor = pickShooterColor(s.grid!, level);
+    setBallColor(s.currentColor);
 
     setShotsLeft(prev => {
       const next = prev - 1;
