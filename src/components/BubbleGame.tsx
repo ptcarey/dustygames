@@ -10,6 +10,7 @@ import { Sfx, setSoundEnabled, unlockAudio } from "@/game/sound";
 import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
+import possumDanceImg from "@/assets/possum-dance.png";
 
 interface Props {
   level: LevelConfig;
