@@ -166,23 +166,38 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const now = performance.now();
     s.popping = s.popping.filter(b => now - b.popStart < 400);
 
+    const dustyTopY = s.canvasH - 110; // approximate top of Dusty's body
     for (const f of s.falling) {
+      if (f.landed) continue;
       f.vy += 1400 * dt;
       f.y += f.vy * dt;
+      // Possums land softly on Dusty; non-possums keep falling off-screen
+      if (f.hasPossum && f.y >= dustyTopY) {
+        f.y = dustyTopY;
+        f.landed = true;
+        f.landedAt = now;
+        Sfx.squeak();
+        flashHappy();
+        setPossumsLeft(p => Math.max(0, p - 1));
+      }
     }
     s.falling = s.falling.filter(f => {
-      if (f.y > s.canvasH + 40) {
-        if (f.hasPossum) {
-          s.savedPossums.push({ id: f.id, x: f.x, y: s.canvasH - 90, born: now });
-          Sfx.squeak();
-          flashHappy();
-          setPossumsLeft(p => Math.max(0, p - 1));
-        }
-        return false;
+      if (f.landed) {
+        // Linger briefly on Dusty, then disappear
+        return now - (f.landedAt ?? now) < 900;
       }
+      if (f.y > s.canvasH + 40) return false;
       return true;
     });
     s.savedPossums = s.savedPossums.filter(sp => now - sp.born < 1400);
+
+    // Explosion particles
+    for (const p of s.particles) {
+      p.vy += 600 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    s.particles = s.particles.filter(p => now - p.born < p.life);
   };
 
   const flashHappy = () => {
