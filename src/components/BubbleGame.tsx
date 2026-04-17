@@ -313,6 +313,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
   const checkEnd = (shots: number) => {
     const s = stateRef.current;
     const grid = s.grid!;
+    if (overlayRef.current) return;
     const remainingPossums = grid.bubbles.filter(b => b.hasPossum).length
       + s.falling.filter(b => b.hasPossum).length;
     if (remainingPossums === 0) {
