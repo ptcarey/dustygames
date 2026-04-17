@@ -368,11 +368,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
 
     if (s.projectile) {
       drawBubble(ctx, s.projectile.x, s.projectile.y, s.projectile.color, false);
-    } else {
-      drawBubble(ctx, s.shooterX, s.shooterY, s.currentColor, false);
     }
-
-    drawBubble(ctx, s.shooterX - 60, s.shooterY + 20, s.nextColor, false, 0.7);
   };
 
   const drawBubble = (
