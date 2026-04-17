@@ -20,6 +20,7 @@ interface Props {
 }
 
 interface SavedPossum { id: number; x: number; y: number; born: number; }
+interface Particle { x: number; y: number; vx: number; vy: number; color: BubbleColor; born: number; life: number; size: number; }
 
 const SHOOT_SPEED = 900; // px/sec
 
@@ -39,8 +40,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     aiming: boolean;
     aimAngle: number;
     popping: Array<Bubble & { popStart: number }>;
-    falling: Array<Bubble & { vy: number }>;
+    falling: Array<Bubble & { vy: number; landed?: boolean; landedAt?: number }>;
     savedPossums: SavedPossum[];
+    particles: Particle[];
     lastTs: number;
     rafId: number;
     scrollY: number;       // current rendered offset (animated)
@@ -52,7 +54,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     currentColor: "red", nextColor: "blue",
     projectile: null,
     aiming: false, aimAngle: -Math.PI / 2,
-    popping: [], falling: [], savedPossums: [],
+    popping: [], falling: [], savedPossums: [], particles: [],
     lastTs: 0, rafId: 0,
     scrollY: 0, targetScrollY: 0,
   });
@@ -96,7 +98,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     setBallColor(s.currentColor);
     setNextBallColor(s.nextColor);
     s.projectile = null;
-    s.popping = []; s.falling = []; s.savedPossums = [];
+    s.popping = []; s.falling = []; s.savedPossums = []; s.particles = [];
     s.scrollY = 0; s.targetScrollY = 0;
 
     setShotsLeft(level.shots);
@@ -164,23 +166,38 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const now = performance.now();
     s.popping = s.popping.filter(b => now - b.popStart < 400);
 
+    const dustyTopY = s.canvasH - 110; // approximate top of Dusty's body
     for (const f of s.falling) {
+      if (f.landed) continue;
       f.vy += 1400 * dt;
       f.y += f.vy * dt;
+      // Possums land softly on Dusty; non-possums keep falling off-screen
+      if (f.hasPossum && f.y >= dustyTopY) {
+        f.y = dustyTopY;
+        f.landed = true;
+        f.landedAt = now;
+        Sfx.squeak();
+        flashHappy();
+        setPossumsLeft(p => Math.max(0, p - 1));
+      }
     }
     s.falling = s.falling.filter(f => {
-      if (f.y > s.canvasH + 40) {
-        if (f.hasPossum) {
-          s.savedPossums.push({ id: f.id, x: f.x, y: s.canvasH - 90, born: now });
-          Sfx.squeak();
-          flashHappy();
-          setPossumsLeft(p => Math.max(0, p - 1));
-        }
-        return false;
+      if (f.landed) {
+        // Linger briefly on Dusty, then disappear
+        return now - (f.landedAt ?? now) < 900;
       }
+      if (f.y > s.canvasH + 40) return false;
       return true;
     });
     s.savedPossums = s.savedPossums.filter(sp => now - sp.born < 1400);
+
+    // Explosion particles
+    for (const p of s.particles) {
+      p.vy += 600 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    s.particles = s.particles.filter(p => now - p.born < p.life);
   };
 
   const flashHappy = () => {
@@ -217,7 +234,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     grid.bubbles.push(newBubble);
 
     const cluster = findColorCluster(grid, newBubble);
-    if (cluster.length >= 3) {
+    if (cluster.length >= 2) {
       processChain(cluster);
     } else {
       tickAfterShot(false);
@@ -234,7 +251,23 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     cluster.forEach((b, i) => {
       chainTotal += (i + 1) * 10;
       // Popping is purely visual; bake current scrollY into screen position
-      s.popping.push({ ...b, y: b.y + s.scrollY, popStart: performance.now() + i * 30 });
+      const px = b.x, py = b.y + s.scrollY;
+      s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
+      // Spawn explosion particles
+      const pieces = 8;
+      for (let k = 0; k < pieces; k++) {
+        const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
+        const speed = 120 + Math.random() * 160;
+        s.particles.push({
+          x: px, y: py,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 60,
+          color: b.color,
+          born: performance.now() + i * 30,
+          life: 600 + Math.random() * 200,
+          size: 3 + Math.random() * 3,
+        });
+      }
       setTimeout(() => Sfx.pop(i), i * 40);
       if (b.hasPossum) {
         s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
@@ -331,7 +364,29 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.restore();
 
     // Falling/popping already have screen coords
-    for (const b of s.falling) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+    const nowDraw = performance.now();
+    for (const b of s.falling) {
+      ctx.save();
+      if (b.landed && b.landedAt) {
+        const lt = (nowDraw - b.landedAt) / 900;
+        ctx.globalAlpha = Math.max(0, 1 - lt);
+      }
+      drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+      ctx.restore();
+    }
+
+    // Explosion particles
+    for (const p of s.particles) {
+      const pt = (nowDraw - p.born) / p.life;
+      if (pt < 0) continue;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - pt);
+      ctx.fillStyle = COLOR_HSL[p.color];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (1 - pt * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     const now = performance.now();
     for (const b of s.popping) {
@@ -511,14 +566,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
           onPointerCancel={onPointerUp}
         />
 
-        {/* Current + next ball indicators next to Dusty */}
-        <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
-          <BubbleSvg color={ballColor} size={42} />
-          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
+        <div className="pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2" style={{ marginBottom: -10 }}>
+          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
         </div>
 
-        <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
-          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
+        {/* Current + next ball indicators next to Dusty (in front) */}
+        <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
+          <BubbleSvg color={ballColor} size={42} />
+          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
         </div>
       </div>
 
