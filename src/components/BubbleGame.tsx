@@ -364,7 +364,29 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.restore();
 
     // Falling/popping already have screen coords
-    for (const b of s.falling) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+    const nowDraw = performance.now();
+    for (const b of s.falling) {
+      ctx.save();
+      if (b.landed && b.landedAt) {
+        const lt = (nowDraw - b.landedAt) / 900;
+        ctx.globalAlpha = Math.max(0, 1 - lt);
+      }
+      drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+      ctx.restore();
+    }
+
+    // Explosion particles
+    for (const p of s.particles) {
+      const pt = (nowDraw - p.born) / p.life;
+      if (pt < 0) continue;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - pt);
+      ctx.fillStyle = COLOR_HSL[p.color];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (1 - pt * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     const now = performance.now();
     for (const b of s.popping) {
