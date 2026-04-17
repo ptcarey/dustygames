@@ -136,13 +136,26 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     const grid = s.grid;
     if (!grid) return;
 
-    // Anchor the TOPMOST remaining bubble to just under the header so the stack
-    // always starts at the top of the playfield (no floating gap above row 0).
-    let minRow = Infinity;
-    for (const b of grid.bubbles) if (b.row < minRow) minRow = b.row;
-    if (!isFinite(minRow)) minRow = 0;
-    s.targetScrollY = -minRow * grid.rowHeight;
-    // Smoothly approach target
+    // Visible window is capped at 15 rows. If the stack is taller than that,
+    // anchor the BOTTOM of the stack to the bottom of the visible window so
+    // the player sees the deepest 15 rows. As bubbles clear and the stack
+    // shrinks below 15 rows, switch to anchoring the TOP under the header so
+    // short levels never have a floating gap above row 0.
+    const VISIBLE_ROWS = 15;
+    let minRow = Infinity, maxRow = -Infinity;
+    for (const b of grid.bubbles) {
+      if (b.row < minRow) minRow = b.row;
+      if (b.row > maxRow) maxRow = b.row;
+    }
+    if (!isFinite(minRow)) { minRow = 0; maxRow = 0; }
+    const stackHeight = maxRow - minRow + 1;
+    if (stackHeight > VISIBLE_ROWS) {
+      // Show the bottom VISIBLE_ROWS rows of the stack.
+      s.targetScrollY = (VISIBLE_ROWS - 1 - maxRow) * grid.rowHeight;
+    } else {
+      // Whole stack fits — pin its top row under the header.
+      s.targetScrollY = -minRow * grid.rowHeight;
+    }
     const diff = s.targetScrollY - s.scrollY;
     s.scrollY += diff * Math.min(1, dt * 3);
 
