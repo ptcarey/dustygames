@@ -6,7 +6,7 @@
 import type { Bubble, BubbleColor, LevelConfig } from "./types";
 import { charToBubble } from "./levels";
 
-export const RADIUS = 22;          // logical bubble radius (px @ 1x)
+export const RADIUS = 15;          // logical bubble radius (px @ 1x) — 30% smaller
 export const DIAMETER = RADIUS * 2;
 export const ROW_HEIGHT = Math.round(DIAMETER * 0.866); // hex spacing
 
@@ -24,9 +24,9 @@ let nextId = 1;
 
 export function buildLevel(level: LevelConfig, canvasWidth: number): GridState {
   const cols = level.cols;
-  const totalWidth = cols * DIAMETER;
-  // Center horizontally in canvas
-  const offsetX = (canvasWidth - totalWidth) / 2 + RADIUS;
+  // Reserve a little side padding so bubbles don't touch the wall
+  const sidePad = 6;
+  const offsetX = sidePad + RADIUS;
   const offsetY = RADIUS + 8;
 
   const colX = (row: number, col: number) =>

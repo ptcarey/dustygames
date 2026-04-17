@@ -37,12 +37,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     nextColor: BubbleColor;
     projectile: { x: number; y: number; vx: number; vy: number; color: BubbleColor } | null;
     aiming: boolean;
-    aimAngle: number; // radians from +x
+    aimAngle: number;
     popping: Array<Bubble & { popStart: number }>;
     falling: Array<Bubble & { vy: number }>;
     savedPossums: SavedPossum[];
     lastTs: number;
     rafId: number;
+    scrollY: number;       // current rendered offset (animated)
+    targetScrollY: number; // computed each step
 }>({
     grid: null,
     canvasW: 0, canvasH: 0, dpr: 1,
@@ -52,6 +54,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     aiming: false, aimAngle: -Math.PI / 2,
     popping: [], falling: [], savedPossums: [],
     lastTs: 0, rafId: 0,
+    scrollY: 0, targetScrollY: 0,
   });
 
   const [shotsLeft, setShotsLeft] = useState(level.shots);
@@ -59,6 +62,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
   const [possumsLeft, setPossumsLeft] = useState(0);
   const [dustyMood, setDustyMood] = useState<"idle" | "happy" | "wag">("wag");
   const [overlay, setOverlay] = useState<"win" | "lose" | null>(null);
+  const [ballColor, setBallColor] = useState<BubbleColor>("red");
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
@@ -88,8 +92,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.shooterY = h - 80;
     s.currentColor = pickShooterColor(grid, level);
     s.nextColor = pickShooterColor(grid, level);
+    setBallColor(s.currentColor);
     s.projectile = null;
     s.popping = []; s.falling = []; s.savedPossums = [];
+    s.scrollY = 0; s.targetScrollY = 0;
 
     setShotsLeft(level.shots);
     setScore(0);
@@ -124,6 +130,16 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const grid = s.grid;
     if (!grid) return;
 
+    // Compute target scroll: anchor bottom of remaining stack to ~visible row 14
+    const VISIBLE_ROWS = 15;
+    let maxRow = 0;
+    for (const b of grid.bubbles) if (b.row > maxRow) maxRow = b.row;
+    s.targetScrollY = (VISIBLE_ROWS - 1 - maxRow) * ROW_HEIGHT;
+    if (s.targetScrollY > 0) s.targetScrollY = 0; // never push above natural top
+    // Smoothly approach target
+    const diff = s.targetScrollY - s.scrollY;
+    s.scrollY += diff * Math.min(1, dt * 3);
+
     if (s.projectile) {
       const p = s.projectile;
       p.x += p.vx * dt;
@@ -134,7 +150,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       let hit = false;
       if (p.y <= RADIUS + 8) hit = true;
       for (const b of grid.bubbles) {
-        const dx = b.x - p.x, dy = b.y - p.y;
+        const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
         if (dx * dx + dy * dy < (DIAMETER * 0.92) ** 2) { hit = true; break; }
       }
       if (hit) {
@@ -174,7 +190,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const s = stateRef.current;
     const grid = s.grid!;
 
-    let { row, col } = snapToGrid(grid, p.x, p.y);
+    // Convert visible y back to logical (grid) y by removing scroll offset
+    let { row, col } = snapToGrid(grid, p.x, p.y - s.scrollY);
     const occupied = new Set(grid.bubbles.map(b => `${b.row},${b.col}`));
     if (occupied.has(`${row},${col}`)) {
       const candidates: Array<[number, number]> = [
@@ -214,10 +231,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     let chainTotal = 0;
     cluster.forEach((b, i) => {
       chainTotal += (i + 1) * 10;
-      s.popping.push({ ...b, popStart: performance.now() + i * 30 });
+      // Popping is purely visual; bake current scrollY into screen position
+      s.popping.push({ ...b, y: b.y + s.scrollY, popStart: performance.now() + i * 30 });
       setTimeout(() => Sfx.pop(i), i * 40);
       if (b.hasPossum) {
-        s.savedPossums.push({ id: b.id, x: b.x, y: b.y, born: performance.now() });
+        s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
         setPossumsLeft(pl => Math.max(0, pl - 1));
         setTimeout(() => Sfx.squeak(), i * 40 + 60);
       }
@@ -233,7 +251,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       floaters.forEach(b => {
         bonus++;
         chainTotal += bonus * 10;
-        s.falling.push({ ...b, vy: 0 });
+        // Bake scroll offset into the falling bubble so it drops from where it visually sits
+        s.falling.push({ ...b, y: b.y + s.scrollY, vy: 0 });
       });
       setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (cluster.length + i + 1) * 10, 0));
     }
@@ -245,6 +264,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const s = stateRef.current;
     s.currentColor = s.nextColor;
     s.nextColor = pickShooterColor(s.grid!, level);
+    setBallColor(s.currentColor);
 
     setShotsLeft(prev => {
       const next = prev - 1;
@@ -285,6 +305,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
     ctx.clearRect(0, 0, s.canvasW, s.canvasH);
 
+    // Top ceiling line
     ctx.strokeStyle = "rgba(255,255,255,0.6)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -292,11 +313,29 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.lineTo(s.canvasW, 4);
     ctx.stroke();
 
+    // Bouncy side walls
+    const wallGrad = ctx.createLinearGradient(0, 0, 6, 0);
+    wallGrad.addColorStop(0, "rgba(255,255,255,0.45)");
+    wallGrad.addColorStop(1, "rgba(255,255,255,0.05)");
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(0, 0, 6, s.canvasH);
+    const wallGrad2 = ctx.createLinearGradient(s.canvasW - 6, 0, s.canvasW, 0);
+    wallGrad2.addColorStop(0, "rgba(255,255,255,0.05)");
+    wallGrad2.addColorStop(1, "rgba(255,255,255,0.45)");
+    ctx.fillStyle = wallGrad2;
+    ctx.fillRect(s.canvasW - 6, 0, 6, s.canvasH);
+
     if (s.aiming && !s.projectile) {
       drawAimGuide(ctx, s);
     }
 
+    // Render grid bubbles with scroll offset
+    ctx.save();
+    ctx.translate(0, s.scrollY);
     for (const b of grid.bubbles) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+    ctx.restore();
+
+    // Falling/popping already have screen coords
     for (const b of s.falling) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
 
     const now = performance.now();
@@ -372,18 +411,23 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     if (vy >= -0.05) vy = -0.05;
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 4;
-    ctx.setLineDash([8, 10]);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 8]);
+
+    // Cap the dotted guide length to roughly one third of the canvas height
+    const MAX_LEN = s.canvasH / 3;
+    let remaining = MAX_LEN;
 
     let segments = 0;
     const grid = s.grid!;
-    while (segments < 3 && y > 30) {
-      let tWall = Infinity, wall: "L" | "R" | null = null;
-      if (vx < 0) { tWall = (RADIUS - x) / vx; wall = "L"; }
-      else if (vx > 0) { tWall = (s.canvasW - RADIUS - x) / vx; wall = "R"; }
+    while (segments < 5 && remaining > 4 && y > 30) {
+      let tWall = Infinity;
+      if (vx < 0) tWall = (RADIUS - x) / vx;
+      else if (vx > 0) tWall = (s.canvasW - RADIUS - x) / vx;
       let tHit = Infinity;
       for (const b of grid.bubbles) {
-        const dx = b.x - x, dy = b.y - y;
+        const by = b.y + s.scrollY;
+        const dx = b.x - x, dy = by - y;
         const dot = dx * vx + dy * vy;
         if (dot <= 0) continue;
         const closest = Math.sqrt(Math.max(0, dx * dx + dy * dy - dot * dot));
@@ -393,17 +437,24 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
         }
       }
       const tCeil = (RADIUS + 8 - y) / vy;
-      const t = Math.min(tWall, tHit, tCeil);
+      let t = Math.min(tWall, tHit, tCeil);
+      const cappedByLen = t > remaining;
+      if (cappedByLen) t = remaining;
       const ex = x + vx * t, ey = y + vy * t;
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.setLineDash([8, 10]);
 
-      if (t === tHit || t === tCeil) break;
+      if (cappedByLen) break;
+      // End-cap dot only at terminal hits, not bounces
+      if (t === tHit || t === tCeil) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.setLineDash([6, 8]);
+        break;
+      }
+      remaining -= t;
       x = ex; y = ey;
-      vx = -vx;
+      vx = -vx; // wall bounce
       segments++;
     }
     ctx.restore();
@@ -491,7 +542,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       </div>
 
       <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
-        <Dusty size={160} mood={dustyMood} />
+        <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
       </div>
 
       {overlay === "win" && (

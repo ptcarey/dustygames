@@ -18,69 +18,78 @@ export function charToBubble(ch: string): { color: BubbleColor; possum: boolean 
   return { color, possum: ch !== lower };
 }
 
-/** 5 hand-crafted starter levels. */
+/**
+ * 5 hand-crafted starter levels (15 wide). Colors are spread in small pockets
+ * so it takes 3+ layers to reach the deepest possum (uppercase letter).
+ */
 const HANDCRAFTED: LevelConfig[] = [
   {
-    id: 1, name: "Hello Dusty!", shots: 12, cols: 9,
+    id: 1, name: "Hello Dusty!", shots: 14, cols: 15,
     shooterColors: ["red", "blue", "yellow"],
     grid: [
-      "rrrrrrrrr",
-      "bbbBbbbbb",
-      "yyyyyyyyy",
+      "rrbbyyrrbbyyrrb",
+      "byyrrbbyyrrbbyy",
+      "rbybryyBrybyrby",
+      "...rby...rby...",
     ],
   },
   {
-    id: 2, name: "First Friend", shots: 14, cols: 9,
+    id: 2, name: "First Friend", shots: 16, cols: 15,
     shooterColors: ["red", "blue", "green", "yellow"],
     grid: [
-      "rrbbggyyr",
-      "rrbbGgyyr",
-      "rrbbggyyr",
-      "..bb..yy.",
+      "rgbygrgbygrgbyr",
+      "byrgbygrbygrbyg",
+      "grybGgrybyrgryb",
+      "rb.yg.br.yg.rby",
+      "...g.b.r.y.....",
     ],
   },
   {
-    id: 3, name: "Possum Party", shots: 16, cols: 9,
+    id: 3, name: "Possum Party", shots: 18, cols: 15,
     shooterColors: ["red", "blue", "green", "yellow", "pink"],
     grid: [
-      "rrkkbbggy",
-      "rRkkBbgGy",
-      "rrkkbbggy",
-      ".rkk.bgg.",
-      "..K...G..",
+      "rkbygkrbygkrbyk",
+      "ygrbkygrbkygrbK",
+      "bRygkbrygkbrygk",
+      "gybrkgybrkGybrk",
+      "..yk..rb..yg..k",
     ],
   },
   {
-    id: 4, name: "Rainbow Rescue", shots: 18, cols: 9,
+    id: 4, name: "Rainbow Rescue", shots: 20, cols: 15,
     shooterColors: BUBBLE_COLORS,
     grid: [
-      "rbgykprbg",
-      "rbgYkprbg",
-      "rbgykPrbg",
-      "rbgykprbG",
-      ".bgy.prb.",
+      "rbgykprbgykprbg",
+      "pkygbrPkygbrpky",
+      "gybkprgybkprgyb",
+      "rkpbygrkpbygrkP",
+      "by.gk.rp.bg.yk.",
+      "..r.b.g.y.k.p..",
     ],
   },
   {
-    id: 5, name: "Big Brave Heart", shots: 20, cols: 9,
+    id: 5, name: "Big Brave Heart", shots: 24, cols: 15,
     shooterColors: ["red", "blue", "yellow", "purple", "pink"],
     grid: [
-      "ppppppppp",
-      "pyyyyyyyP",
-      "pyrrrrryp",
-      "pyrkkkRYp",
-      "pyrkbbkyp",
-      "pyrkkKkyp",
-      "pYrrrrryp",
-      "pyyyyyyyp",
+      "ppyypprrkkyybbp",
+      "yppRRppyykkbbpy",
+      "ypprrppykkbbppy",
+      "yppKKppyybbppyy",
+      "ypprrppyykkbbpy",
+      "..yp..yk..bp..y",
+      "....rr....bb...",
+      "......YY.......",
     ],
   },
 ];
 
-/** Procedurally generate levels 6..20 with increasing difficulty. */
+/**
+ * Procedurally generate levels 6..20.
+ * From level 6: at least 20 rows of bubbles. The renderer scrolls so only
+ * ~15 rows are visible at a time and the stack lowers as bubbles are popped.
+ */
 function generateProcedural(): LevelConfig[] {
   const levels: LevelConfig[] = [];
-  // Seeded RNG for reproducibility
   let seed = 12345;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -95,39 +104,54 @@ function generateProcedural(): LevelConfig[] {
     "Big Cuddle", "Final Friends", "Hero Dusty",
   ];
 
+  const colorChar = (c: BubbleColor) => (c === "pink" ? "k" : c[0]);
+
   for (let i = 0; i < 15; i++) {
     const lvlId = 6 + i;
     const difficulty = i / 14; // 0 → 1
-    const cols = 9;
-    const rows = 4 + Math.floor(difficulty * 5); // 4 → 9
-    const colorCount = Math.min(6, 3 + Math.floor(difficulty * 4));
+    const cols = 15;
+    const rows = 20 + Math.floor(difficulty * 10); // 20 → 30
+    const colorCount = Math.min(6, 4 + Math.floor(difficulty * 3));
     const palette = BUBBLE_COLORS.slice(0, colorCount);
-    const shots = Math.max(10, Math.round(rows * cols * 0.45 + (1 - difficulty) * 6));
-    const possumCount = 2 + Math.floor(difficulty * 6);
+    const shots = Math.max(20, Math.round(rows * 1.4 - difficulty * 8));
+    const possumCount = 4 + Math.floor(difficulty * 10);
 
-    // Generate grid
+    // Generate grid: small pockets of color (3-5 wide chunks) instead of huge blobs
     const grid: string[] = [];
     for (let r = 0; r < rows; r++) {
       let row = "";
+      let curColor = pick(palette);
+      let runLeft = 2 + Math.floor(rand() * 3);
       for (let c = 0; c < cols; c++) {
-        // sparse holes increase with difficulty
-        if (rand() < 0.05 + difficulty * 0.08) row += ".";
-        else {
-          const color = pick(palette);
-          row += color[0] === "p" && color === "pink" ? "k" : color[0];
+        if (runLeft <= 0) {
+          // pick a different color for the next pocket
+          let next = pick(palette);
+          if (next === curColor && palette.length > 1) next = pick(palette);
+          curColor = next;
+          runLeft = 2 + Math.floor(rand() * 3);
         }
+        // Sprinkle some gaps so some clusters are not tethered → they fall
+        if (rand() < 0.06 + difficulty * 0.1) {
+          row += ".";
+        } else {
+          row += colorChar(curColor);
+        }
+        runLeft--;
       }
       grid.push(row);
     }
 
-    // Sprinkle possums into random non-empty cells
+    // Sprinkle possums into random non-empty cells, biased toward the bottom
     const cells: Array<[number, number]> = [];
     grid.forEach((row, r) =>
       row.split("").forEach((ch, c) => { if (ch !== ".") cells.push([r, c]); })
     );
-    for (let p = 0; p < possumCount && cells.length; p++) {
-      const idx = Math.floor(rand() * cells.length);
-      const [r, c] = cells.splice(idx, 1)[0];
+    // Sort so deeper rows are preferred for possums
+    cells.sort((a, b) => b[0] - a[0]);
+    const deepPool = cells.slice(0, Math.floor(cells.length * 0.6));
+    for (let p = 0; p < possumCount && deepPool.length; p++) {
+      const idx = Math.floor(rand() * deepPool.length);
+      const [r, c] = deepPool.splice(idx, 1)[0];
       const arr = grid[r].split("");
       arr[c] = arr[c].toUpperCase();
       grid[r] = arr.join("");
