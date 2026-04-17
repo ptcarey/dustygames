@@ -652,10 +652,10 @@ function Overlay({
   title, subtitle, ctaLabel, onCta, onSecondary,
 }: { title: string; subtitle: string; ctaLabel: string; onCta: () => void; onSecondary?: () => void }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-foreground/50 backdrop-blur-sm animate-bounce-soft">
-      <div className="w-[80%] max-w-sm rounded-3xl bg-card p-6 text-center shadow-2xl">
-        <h2 className="mb-2 text-3xl font-bold text-foreground">{title}</h2>
-        <p className="mb-6 text-lg text-muted-foreground">{subtitle}</p>
+    <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center pt-10 animate-bounce-soft">
+      <div className="pointer-events-auto w-[80%] max-w-sm rounded-3xl bg-card/95 p-5 text-center shadow-2xl backdrop-blur">
+        <h2 className="mb-2 text-2xl font-bold text-foreground">{title}</h2>
+        <p className="mb-5 text-base text-muted-foreground">{subtitle}</p>
         <div className="flex flex-col gap-3">
           <button className="kid-button" onClick={onCta}>{ctaLabel}</button>
           {onSecondary && (
