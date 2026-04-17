@@ -11,7 +11,7 @@ const KEY = "dusty-bubble-pop-save-v1";
 const DEV_UNLOCK_ALL = import.meta.env.DEV;
 
 const DEFAULT: GameSave = {
-  unlockedLevel: DEV_UNLOCK_ALL ? TOTAL_LEVELS : 1,
+  unlockedLevel: TOTAL_LEVELS,
   highScore: 0,
   audioEnabled: true,
 };
@@ -20,7 +20,8 @@ export function loadSave(): GameSave {
   try {
     const raw = localStorage.getItem(KEY);
     const base = raw ? { ...DEFAULT, ...JSON.parse(raw) } : { ...DEFAULT };
-    if (DEV_UNLOCK_ALL) base.unlockedLevel = Math.max(base.unlockedLevel, TOTAL_LEVELS);
+    // All levels are always unlocked
+    base.unlockedLevel = TOTAL_LEVELS;
     return base;
   } catch {
     return { ...DEFAULT };
