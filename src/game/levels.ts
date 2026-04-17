@@ -259,11 +259,8 @@ function generateProcedural(): LevelConfig[] {
     const shots = Math.max(20, Math.round(rows * 1.4 - difficulty * 6));
     const possumCount = 3 + Math.floor(difficulty * 8);
 
-    const style = i % 3;
-    const mask =
-      style === 0 ? makeWeb(rows, difficulty) :
-      style === 1 ? makeLace(rows, difficulty) :
-      makeZigzag(rows, difficulty);
+    const pattern = PATTERNS[i % PATTERNS.length];
+    const mask = pattern(rows, difficulty);
 
     // Color the mask: walk in "patches" so neighbours often share a color,
     // giving small lumps within the lacework. Track which colors actually land
