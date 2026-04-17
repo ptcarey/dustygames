@@ -1,17 +1,23 @@
+import { COLOR_HSL, type BubbleColor } from "@/game/types";
+
 interface Props {
   size?: number;
   /** "idle" | "happy" | "wag" — drives subtle animations. */
   mood?: "idle" | "happy" | "wag";
+  /** Color of the bubble Dusty is about to throw — shown as his bowtie. */
+  ballColor?: BubbleColor;
   className?: string;
 }
 
 /**
  * Dusty — caramel cavoodle. Pure SVG, kid-friendly cartoon.
  * The whole body wiggles on "happy". The tail wags on "wag".
+ * Bowtie color hints at the next bubble he will shoot.
  */
-export function Dusty({ size = 140, mood = "idle", className }: Props) {
+export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props) {
   const wrapAnim = mood === "happy" ? "animate-wiggle" : "";
   const tailAnim = mood === "wag" || mood === "happy" ? "animate-tail-wag" : "";
+  const bowFill = ballColor ? COLOR_HSL[ballColor] : "hsl(var(--primary))";
   return (
     <div className={`inline-block ${wrapAnim} ${className ?? ""}`} style={{ width: size, height: size }}>
       <svg viewBox="0 0 200 200" width={size} height={size}>
