@@ -251,6 +251,8 @@ function generateProcedural(): LevelConfig[] {
       grid[r] = arr.join("");
     }
 
+    pruneFloaters(grid, cols);
+
     levels.push({
       id: lvlId,
       name: NAMES[i],
@@ -261,6 +263,43 @@ function generateProcedural(): LevelConfig[] {
     });
   }
   return levels;
+}
+
+/**
+ * Remove any bubbles not connected (via hex neighbours) to the top row.
+ * Mutates `grid` in place. Mirrors the floater logic in engine.ts so generated
+ * levels never start with bubbles suspended in mid-air.
+ */
+function pruneFloaters(grid: string[], cols: number) {
+  const rows = grid.length;
+  const cells: string[][] = grid.map(row => row.padEnd(cols, ".").split("").slice(0, cols));
+  const has = (r: number, c: number) => r >= 0 && r < rows && c >= 0 && c < cols && cells[r][c] !== ".";
+  const supported: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const queue: Array<[number, number]> = [];
+  for (let c = 0; c < cols; c++) {
+    if (has(0, c)) { supported[0][c] = true; queue.push([0, c]); }
+  }
+  while (queue.length) {
+    const [r, c] = queue.shift()!;
+    const odd = r % 2 === 1;
+    const nbrs: Array<[number, number]> = [
+      [r, c - 1], [r, c + 1],
+      [r - 1, c + (odd ? 0 : -1)], [r - 1, c + (odd ? 1 : 0)],
+      [r + 1, c + (odd ? 0 : -1)], [r + 1, c + (odd ? 1 : 0)],
+    ];
+    for (const [nr, nc] of nbrs) {
+      if (has(nr, nc) && !supported[nr][nc]) {
+        supported[nr][nc] = true;
+        queue.push([nr, nc]);
+      }
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (cells[r][c] !== "." && !supported[r][c]) cells[r][c] = ".";
+    }
+    grid[r] = cells[r].join("");
+  }
 }
 
 export const LEVELS: LevelConfig[] = [...HANDCRAFTED, ...generateProcedural()];

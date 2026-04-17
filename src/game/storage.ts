@@ -2,11 +2,16 @@
  * Local persistence for game progress. localStorage only; no cloud, no auth.
  */
 import type { GameSave } from "./types";
+import { TOTAL_LEVELS } from "./levels";
 
 const KEY = "dusty-bubble-pop-save-v1";
 
+// During development all levels are unlocked so we can jump straight to any
+// level for testing. In production the player must earn each unlock.
+const DEV_UNLOCK_ALL = import.meta.env.DEV;
+
 const DEFAULT: GameSave = {
-  unlockedLevel: 1,
+  unlockedLevel: DEV_UNLOCK_ALL ? TOTAL_LEVELS : 1,
   highScore: 0,
   audioEnabled: true,
 };
