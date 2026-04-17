@@ -302,6 +302,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
     ctx.clearRect(0, 0, s.canvasW, s.canvasH);
 
+    // Top ceiling line
     ctx.strokeStyle = "rgba(255,255,255,0.6)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -309,11 +310,29 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.lineTo(s.canvasW, 4);
     ctx.stroke();
 
+    // Bouncy side walls
+    const wallGrad = ctx.createLinearGradient(0, 0, 6, 0);
+    wallGrad.addColorStop(0, "rgba(255,255,255,0.45)");
+    wallGrad.addColorStop(1, "rgba(255,255,255,0.05)");
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(0, 0, 6, s.canvasH);
+    const wallGrad2 = ctx.createLinearGradient(s.canvasW - 6, 0, s.canvasW, 0);
+    wallGrad2.addColorStop(0, "rgba(255,255,255,0.05)");
+    wallGrad2.addColorStop(1, "rgba(255,255,255,0.45)");
+    ctx.fillStyle = wallGrad2;
+    ctx.fillRect(s.canvasW - 6, 0, 6, s.canvasH);
+
     if (s.aiming && !s.projectile) {
       drawAimGuide(ctx, s);
     }
 
+    // Render grid bubbles with scroll offset
+    ctx.save();
+    ctx.translate(0, s.scrollY);
     for (const b of grid.bubbles) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+    ctx.restore();
+
+    // Falling/popping already have screen coords
     for (const b of s.falling) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
 
     const now = performance.now();
