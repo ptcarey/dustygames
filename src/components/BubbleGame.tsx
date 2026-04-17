@@ -188,7 +188,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const s = stateRef.current;
     const grid = s.grid!;
 
-    let { row, col } = snapToGrid(grid, p.x, p.y);
+    // Convert visible y back to logical (grid) y by removing scroll offset
+    let { row, col } = snapToGrid(grid, p.x, p.y - s.scrollY);
     const occupied = new Set(grid.bubbles.map(b => `${b.row},${b.col}`));
     if (occupied.has(`${row},${col}`)) {
       const candidates: Array<[number, number]> = [
