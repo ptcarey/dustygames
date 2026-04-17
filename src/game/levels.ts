@@ -114,11 +114,16 @@ function generateProcedural(): LevelConfig[] {
    */
   const cols = 15;
 
+  /** Fill the very top row so patterns stay anchored after pruneFloaters. */
+  const anchorTop = (g: boolean[][]) => {
+    for (let c = 0; c < cols; c++) g[0][c] = true;
+  };
+
+  /** Spider-web: concentric oval "threads" plus radial spokes from the center. */
   const makeWeb = (rows: number, density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
     const cx = (cols - 1) / 2;
     const cy = rows / 2;
-    // Concentric "rings" (ovals) — the radial threads of a web.
     const ringCount = 3 + Math.floor(density * 3);
     for (let k = 1; k <= ringCount; k++) {
       const rx = (cols / 2) * (k / (ringCount + 0.5));
@@ -128,33 +133,28 @@ function generateProcedural(): LevelConfig[] {
           const dx = (c - cx) / rx;
           const dy = (r - cy) / ry;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (Math.abs(d - 1) < 0.09) g[r][c] = true;
+          if (Math.abs(d - 1) < 0.12) g[r][c] = true;
         }
       }
     }
-    // Spokes — diagonal threads from the center outward.
-    const spokes = 6;
+    // Spokes — radial threads from the center outward, anchoring the rings to the top.
+    const spokes = 8;
     for (let s = 0; s < spokes; s++) {
-      const ang = (Math.PI * 2 * s) / spokes + 0.2;
-      for (let t = 0; t < Math.max(rows, cols); t++) {
-        const r = Math.round(cy + Math.sin(ang) * t * 0.6);
-        const c = Math.round(cx + Math.cos(ang) * t * 0.9);
+      const ang = (Math.PI * 2 * s) / spokes;
+      for (let t = 0; t < Math.max(rows, cols) * 1.2; t++) {
+        const r = Math.round(cy + Math.sin(ang) * t * 0.55);
+        const c = Math.round(cx + Math.cos(ang) * t * 0.85);
         if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
       }
     }
+    anchorTop(g);
     return g;
   };
 
+  /** Lace: tiled diamond stamp + a few small lumps for organic variety. */
   const makeLace = (rows: number, density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    // Repeating diamond/floral lace motif: a small stamp tiled across the grid.
-    const stamp = [
-      "..x..",
-      ".x.x.",
-      "x.x.x",
-      ".x.x.",
-      "..x..",
-    ];
+    const stamp = ["..x..", ".x.x.", "x.x.x", ".x.x.", "..x.."];
     const sw = stamp[0].length;
     const sh = stamp.length;
     for (let r0 = 0; r0 < rows; r0 += sh - 1) {
@@ -170,7 +170,6 @@ function generateProcedural(): LevelConfig[] {
         }
       }
     }
-    // Add a few small "lumps" — 2x2 ish clusters scattered around.
     const lumps = 2 + Math.floor(density * 4);
     for (let i = 0; i < lumps; i++) {
       const r = Math.floor(rand() * (rows - 2));
@@ -178,12 +177,13 @@ function generateProcedural(): LevelConfig[] {
       g[r][c] = true; g[r][c + 1] = true;
       g[r + 1][c] = true; g[r + 1][c + 1] = true;
     }
+    anchorTop(g);
     return g;
   };
 
+  /** Zigzag: alternating lace bands tied together with vertical "drop" threads. */
   const makeZigzag = (rows: number, density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    // Horizontal lace bands separated by gaps; every few rows a denser garland.
     for (let r = 0; r < rows; r++) {
       const band = r % 4;
       for (let c = 0; c < cols; c++) {
@@ -191,13 +191,17 @@ function generateProcedural(): LevelConfig[] {
         else if (band === 2 && c % 3 === (r % 3)) g[r][c] = true;
       }
     }
-    // Sprinkle small lumps for variety.
+    // Vertical drop-threads keep the lower bands connected to the top.
+    for (let c = 1; c < cols; c += 3) {
+      for (let r = 0; r < rows; r++) g[r][c] = true;
+    }
     const lumps = 3 + Math.floor(density * 4);
     for (let i = 0; i < lumps; i++) {
       const r = Math.floor(rand() * (rows - 1));
       const c = Math.floor(rand() * (cols - 1));
       g[r][c] = true; g[r][c + 1] = true; g[r + 1][c] = true;
     }
+    anchorTop(g);
     return g;
   };
 
@@ -211,7 +215,6 @@ function generateProcedural(): LevelConfig[] {
     const shots = Math.max(20, Math.round(rows * 1.4 - difficulty * 6));
     const possumCount = 3 + Math.floor(difficulty * 8);
 
-    // Pick a pattern style — cycle through web / lace / zigzag.
     const style = i % 3;
     const mask =
       style === 0 ? makeWeb(rows, difficulty) :
@@ -219,7 +222,9 @@ function generateProcedural(): LevelConfig[] {
       makeZigzag(rows, difficulty);
 
     // Color the mask: walk in "patches" so neighbours often share a color,
-    // giving small lumps within the lacework.
+    // giving small lumps within the lacework. Track which colors actually land
+    // in the grid so the shooter palette only offers usable ammo.
+    const used = new Set<BubbleColor>();
     const colorGrid: string[][] = mask.map(row => row.map(() => "."));
     for (let r = 0; r < rows; r++) {
       let curColor = pick(palette);
@@ -231,6 +236,7 @@ function generateProcedural(): LevelConfig[] {
           runLeft = 2 + Math.floor(rand() * 3);
         }
         colorGrid[r][c] = colorChar(curColor);
+        used.add(curColor);
         runLeft--;
       }
     }
@@ -253,12 +259,15 @@ function generateProcedural(): LevelConfig[] {
 
     pruneFloaters(grid, cols);
 
+    // Restrict shooter palette to colors that actually survived in the grid.
+    const shooterColors = palette.filter(c => used.has(c));
+
     levels.push({
       id: lvlId,
       name: NAMES[i],
       shots,
       cols,
-      shooterColors: palette,
+      shooterColors: shooterColors.length ? shooterColors : palette,
       grid,
     });
   }
