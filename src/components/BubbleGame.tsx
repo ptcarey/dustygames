@@ -128,6 +128,16 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const grid = s.grid;
     if (!grid) return;
 
+    // Compute target scroll: anchor bottom of remaining stack to ~visible row 14
+    const VISIBLE_ROWS = 15;
+    let maxRow = 0;
+    for (const b of grid.bubbles) if (b.row > maxRow) maxRow = b.row;
+    s.targetScrollY = (VISIBLE_ROWS - 1 - maxRow) * ROW_HEIGHT;
+    if (s.targetScrollY > 0) s.targetScrollY = 0; // never push above natural top
+    // Smoothly approach target
+    const diff = s.targetScrollY - s.scrollY;
+    s.scrollY += diff * Math.min(1, dt * 3);
+
     if (s.projectile) {
       const p = s.projectile;
       p.x += p.vx * dt;
@@ -138,7 +148,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       let hit = false;
       if (p.y <= RADIUS + 8) hit = true;
       for (const b of grid.bubbles) {
-        const dx = b.x - p.x, dy = b.y - p.y;
+        const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
         if (dx * dx + dy * dy < (DIAMETER * 0.92) ** 2) { hit = true; break; }
       }
       if (hit) {
