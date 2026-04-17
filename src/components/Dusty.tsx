@@ -77,6 +77,14 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props
         {/* cheek blush */}
         <ellipse cx="74" cy="105" rx="6" ry="3" fill="hsl(0 80% 75%)" opacity="0.5" />
         <ellipse cx="126" cy="105" rx="6" ry="3" fill="hsl(0 80% 75%)" opacity="0.5" />
+
+        {/* bowtie / collar — colored to match the bubble Dusty will throw */}
+        <g transform="translate(100 138)">
+          <path d="M-18 -6 L-2 0 L-18 6 Z" fill={bowFill} stroke="rgba(0,0,0,0.18)" strokeWidth="1" />
+          <path d="M18 -6 L2 0 L18 6 Z" fill={bowFill} stroke="rgba(0,0,0,0.18)" strokeWidth="1" />
+          <circle cx="0" cy="0" r="5" fill={bowFill} stroke="rgba(0,0,0,0.18)" strokeWidth="1" />
+          <circle cx="-1.5" cy="-1.5" r="1.5" fill="rgba(255,255,255,0.7)" />
+        </g>
       </svg>
     </div>
   );
