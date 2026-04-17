@@ -94,6 +94,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.currentColor = pickShooterColor(grid, level);
     s.nextColor = pickShooterColor(grid, level);
     setBallColor(s.currentColor);
+    setNextBallColor(s.nextColor);
     s.projectile = null;
     s.popping = []; s.falling = []; s.savedPossums = [];
     s.scrollY = 0; s.targetScrollY = 0;
@@ -266,6 +267,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.currentColor = s.nextColor;
     s.nextColor = pickShooterColor(s.grid!, level);
     setBallColor(s.currentColor);
+    setNextBallColor(s.nextColor);
 
     setShotsLeft(prev => {
       const next = prev - 1;
@@ -411,17 +413,20 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     let vx = Math.cos(s.aimAngle), vy = Math.sin(s.aimAngle);
     if (vy >= -0.05) vy = -0.05;
     ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 3;
+    const guideColor = COLOR_HSL[s.currentColor];
+    ctx.strokeStyle = guideColor;
+    ctx.lineWidth = 4;
     ctx.setLineDash([6, 8]);
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 4;
 
-    // Cap the dotted guide length to roughly one third of the canvas height
-    const MAX_LEN = s.canvasH / 3;
+    // Cap the dotted guide length to roughly 60% of the canvas height
+    const MAX_LEN = s.canvasH * 0.6;
     let remaining = MAX_LEN;
 
     let segments = 0;
     const grid = s.grid!;
-    while (segments < 5 && remaining > 4 && y > 30) {
+    while (segments < 6 && remaining > 4 && y > 30) {
       let tWall = Infinity;
       if (vx < 0) tWall = (RADIUS - x) / vx;
       else if (vx > 0) tWall = (s.canvasW - RADIUS - x) / vx;
@@ -448,8 +453,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       // End-cap dot only at terminal hits, not bounces
       if (t === tHit || t === tCeil) {
         ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = guideColor;
+        ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI * 2); ctx.fill();
         ctx.setLineDash([6, 8]);
         break;
       }
