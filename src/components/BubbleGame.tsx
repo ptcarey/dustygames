@@ -542,7 +542,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       </div>
 
       <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
-        <Dusty size={160} mood={dustyMood} />
+        <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
       </div>
 
       {overlay === "win" && (
