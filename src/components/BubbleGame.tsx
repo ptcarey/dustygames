@@ -20,6 +20,7 @@ interface Props {
 }
 
 interface SavedPossum { id: number; x: number; y: number; born: number; }
+interface Particle { x: number; y: number; vx: number; vy: number; color: BubbleColor; born: number; life: number; size: number; }
 
 const SHOOT_SPEED = 900; // px/sec
 
