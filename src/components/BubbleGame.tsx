@@ -54,7 +54,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     currentColor: "red", nextColor: "blue",
     projectile: null,
     aiming: false, aimAngle: -Math.PI / 2,
-    popping: [], falling: [], savedPossums: [],
+    popping: [], falling: [], savedPossums: [], particles: [],
     lastTs: 0, rafId: 0,
     scrollY: 0, targetScrollY: 0,
   });
