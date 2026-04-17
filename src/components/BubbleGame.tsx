@@ -37,12 +37,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     nextColor: BubbleColor;
     projectile: { x: number; y: number; vx: number; vy: number; color: BubbleColor } | null;
     aiming: boolean;
-    aimAngle: number; // radians from +x
+    aimAngle: number;
     popping: Array<Bubble & { popStart: number }>;
     falling: Array<Bubble & { vy: number }>;
     savedPossums: SavedPossum[];
     lastTs: number;
     rafId: number;
+    scrollY: number;       // current rendered offset (animated)
+    targetScrollY: number; // computed each step
 }>({
     grid: null,
     canvasW: 0, canvasH: 0, dpr: 1,
@@ -52,6 +54,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     aiming: false, aimAngle: -Math.PI / 2,
     popping: [], falling: [], savedPossums: [],
     lastTs: 0, rafId: 0,
+    scrollY: 0, targetScrollY: 0,
   });
 
   const [shotsLeft, setShotsLeft] = useState(level.shots);
