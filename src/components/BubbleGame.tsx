@@ -519,28 +519,32 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
         />
       </div>
 
-      <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
+      <div className="pointer-events-none absolute right-0 top-0 flex flex-col items-end gap-2 p-3">
+        <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
+          <div className="text-2xl font-bold text-foreground">{score}</div>
+        </div>
+        <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
+          <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
+        </div>
+        <div className="flex items-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
+          <svg width="22" height="22" viewBox="-22 -22 44 44">
+            <PossumFace />
+          </svg>
+          <span className="text-lg font-bold">{possumsLeft}</span>
+        </div>
+        <div className="pointer-events-auto rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
           <Button size="sm" variant="secondary" onClick={onExit} aria-label="Back to menu">
             ← Menu
           </Button>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
-            <div className="text-2xl font-bold text-foreground">{score}</div>
-          </div>
-          <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
-            <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
-          </div>
-          <div className="flex items-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
-            <svg width="22" height="22" viewBox="-22 -22 44 44">
-              <PossumFace />
-            </svg>
-            <span className="text-lg font-bold">{possumsLeft}</span>
-          </div>
-        </div>
+      </div>
+
+      {/* Current + next ball indicators next to Dusty */}
+      <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
+        <BubbleSvg color={ballColor} size={42} />
+        <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
       </div>
 
       <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
