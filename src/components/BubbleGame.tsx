@@ -8,7 +8,7 @@ import { COLOR_HSL } from "@/game/types";
 import type { Bubble, BubbleColor, LevelConfig } from "@/game/types";
 import { Sfx, setSoundEnabled, unlockAudio } from "@/game/sound";
 import { Dusty } from "./Dusty";
-import { PossumFace } from "./BubbleSvg";
+import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 
 interface Props {
@@ -63,6 +63,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
   const [dustyMood, setDustyMood] = useState<"idle" | "happy" | "wag">("wag");
   const [overlay, setOverlay] = useState<"win" | "lose" | null>(null);
   const [ballColor, setBallColor] = useState<BubbleColor>("red");
+  const [nextBallColor, setNextBallColor] = useState<BubbleColor>("blue");
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
@@ -93,6 +94,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.currentColor = pickShooterColor(grid, level);
     s.nextColor = pickShooterColor(grid, level);
     setBallColor(s.currentColor);
+    setNextBallColor(s.nextColor);
     s.projectile = null;
     s.popping = []; s.falling = []; s.savedPossums = [];
     s.scrollY = 0; s.targetScrollY = 0;
@@ -265,6 +267,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.currentColor = s.nextColor;
     s.nextColor = pickShooterColor(s.grid!, level);
     setBallColor(s.currentColor);
+    setNextBallColor(s.nextColor);
 
     setShotsLeft(prev => {
       const next = prev - 1;
@@ -365,11 +368,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
 
     if (s.projectile) {
       drawBubble(ctx, s.projectile.x, s.projectile.y, s.projectile.color, false);
-    } else {
-      drawBubble(ctx, s.shooterX, s.shooterY, s.currentColor, false);
     }
-
-    drawBubble(ctx, s.shooterX - 60, s.shooterY + 20, s.nextColor, false, 0.7);
   };
 
   const drawBubble = (
@@ -410,17 +409,20 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     let vx = Math.cos(s.aimAngle), vy = Math.sin(s.aimAngle);
     if (vy >= -0.05) vy = -0.05;
     ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 3;
+    const guideColor = COLOR_HSL[s.currentColor];
+    ctx.strokeStyle = guideColor;
+    ctx.lineWidth = 4;
     ctx.setLineDash([6, 8]);
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 4;
 
-    // Cap the dotted guide length to roughly one third of the canvas height
-    const MAX_LEN = s.canvasH / 3;
+    // Cap the dotted guide length to roughly 60% of the canvas height
+    const MAX_LEN = s.canvasH * 0.6;
     let remaining = MAX_LEN;
 
     let segments = 0;
     const grid = s.grid!;
-    while (segments < 5 && remaining > 4 && y > 30) {
+    while (segments < 6 && remaining > 4 && y > 30) {
       let tWall = Infinity;
       if (vx < 0) tWall = (RADIUS - x) / vx;
       else if (vx > 0) tWall = (s.canvasW - RADIUS - x) / vx;
@@ -447,8 +449,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       // End-cap dot only at terminal hits, not bounces
       if (t === tHit || t === tCeil) {
         ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = guideColor;
+        ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI * 2); ctx.fill();
         ctx.setLineDash([6, 8]);
         break;
       }
@@ -517,28 +519,32 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
         />
       </div>
 
-      <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
+      <div className="pointer-events-none absolute right-0 top-0 flex flex-col items-end gap-2 p-3">
+        <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
+          <div className="text-2xl font-bold text-foreground">{score}</div>
+        </div>
+        <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
+          <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
+        </div>
+        <div className="flex items-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
+          <svg width="22" height="22" viewBox="-22 -22 44 44">
+            <PossumFace />
+          </svg>
+          <span className="text-lg font-bold">{possumsLeft}</span>
+        </div>
+        <div className="pointer-events-auto rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
           <Button size="sm" variant="secondary" onClick={onExit} aria-label="Back to menu">
             ← Menu
           </Button>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
-            <div className="text-2xl font-bold text-foreground">{score}</div>
-          </div>
-          <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
-            <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
-          </div>
-          <div className="flex items-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
-            <svg width="22" height="22" viewBox="-22 -22 44 44">
-              <PossumFace />
-            </svg>
-            <span className="text-lg font-bold">{possumsLeft}</span>
-          </div>
-        </div>
+      </div>
+
+      {/* Current + next ball indicators next to Dusty */}
+      <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
+        <BubbleSvg color={ballColor} size={42} />
+        <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
       </div>
 
       <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
