@@ -566,14 +566,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
           onPointerCancel={onPointerUp}
         />
 
-        {/* Current + next ball indicators next to Dusty */}
-        <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
-          <BubbleSvg color={ballColor} size={42} />
-          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
+        <div className="pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2" style={{ marginBottom: -10 }}>
+          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
         </div>
 
-        <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
-          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
+        {/* Current + next ball indicators next to Dusty (in front) */}
+        <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
+          <BubbleSvg color={ballColor} size={42} />
+          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
         </div>
       </div>
 
