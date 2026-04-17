@@ -308,14 +308,6 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
     ctx.clearRect(0, 0, s.canvasW, s.canvasH);
 
-    // Top ceiling line
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 4);
-    ctx.lineTo(s.canvasW, 4);
-    ctx.stroke();
-
     // Bouncy side walls
     const wallGrad = ctx.createLinearGradient(0, 0, 6, 0);
     wallGrad.addColorStop(0, "rgba(255,255,255,0.45)");
@@ -507,8 +499,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
   void colorChip;
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <div ref={containerRef} className="absolute inset-0">
+    <div className="relative h-full w-full overflow-hidden flex">
+      {/* Playfield */}
+      <div ref={containerRef} className="relative flex-1 h-full">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 touch-none"
@@ -517,38 +510,37 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         />
+
+        {/* Current + next ball indicators next to Dusty */}
+        <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
+          <BubbleSvg color={ballColor} size={42} />
+          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
+        </div>
+
+        <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
+          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
+        </div>
       </div>
 
-      <div className="pointer-events-none absolute right-0 top-0 flex flex-col items-end gap-2 p-3">
-        <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
-          <div className="text-2xl font-bold text-foreground">{score}</div>
-        </div>
-        <div className="rounded-2xl bg-white/85 px-4 py-2 shadow-md backdrop-blur">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
-          <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
-        </div>
-        <div className="flex items-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
+      {/* Side panel — outside the playfield, stacked from bottom up */}
+      <div className="flex w-24 flex-col-reverse items-stretch gap-2 p-2 sm:w-28">
+        <Button variant="secondary" onClick={onExit} aria-label="Back to menu" className="w-full">
+          Menu
+        </Button>
+        <div className="flex w-full items-center justify-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
           <svg width="22" height="22" viewBox="-22 -22 44 44">
             <PossumFace />
           </svg>
           <span className="text-lg font-bold">{possumsLeft}</span>
         </div>
-        <div className="pointer-events-auto rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
-          <Button size="sm" variant="secondary" onClick={onExit} aria-label="Back to menu">
-            ← Menu
-          </Button>
+        <div className="w-full rounded-2xl bg-white/85 px-3 py-2 text-center shadow-md backdrop-blur">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
+          <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
         </div>
-      </div>
-
-      {/* Current + next ball indicators next to Dusty */}
-      <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
-        <BubbleSvg color={ballColor} size={42} />
-        <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
-      </div>
-
-      <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2" style={{ marginBottom: -10 }}>
-        <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
+        <div className="w-full rounded-2xl bg-white/85 px-3 py-2 text-center shadow-md backdrop-blur">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
+          <div className="text-2xl font-bold text-foreground">{score}</div>
+        </div>
       </div>
 
       {overlay === "win" && (
