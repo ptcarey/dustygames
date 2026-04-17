@@ -559,9 +559,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
   void colorChip;
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative flex h-full w-full flex-col overflow-hidden">
+      {/* Header bar — outside the bubble play area */}
+      <header className="flex h-10 shrink-0 items-center justify-center border-b border-white/40 bg-white/70 px-3 shadow-sm backdrop-blur">
+        <h1 className="text-base font-bold tracking-wide text-foreground">Level {level.id}</h1>
+      </header>
+
       {/* Playfield */}
-      <div ref={containerRef} className="relative h-full w-full">
+      <div ref={containerRef} className="relative flex-1 w-full">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 touch-none"
@@ -571,8 +576,21 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
           onPointerCancel={onPointerUp}
         />
 
-        {/* HUD — inside the playfield, top-right, stacked top→bottom */}
-        <div className="pointer-events-auto absolute right-1.5 top-1.5 z-10 flex w-16 flex-col items-stretch gap-1.5">
+        <div
+          className={`pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2 ${overlay === "win" ? "animate-bounce-soft" : ""}`}
+          style={{ marginBottom: -6 }}
+        >
+          <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
+        </div>
+
+        {/* Current + next ball indicators next to Dusty (in front) */}
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
+          <BubbleSvg color={ballColor} size={32} />
+          <BubbleSvg color={nextBallColor} size={22} className="opacity-80" />
+        </div>
+
+        {/* HUD — bottom-right, inside the right wall, next to Dusty */}
+        <div className="pointer-events-auto absolute bottom-2 right-2 z-10 flex w-16 flex-col items-stretch gap-1.5">
           <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
             <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Score</div>
             <div className="text-base font-bold leading-tight text-foreground">{score}</div>
@@ -597,32 +615,25 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
           </Button>
         </div>
 
-        <div
-          className={`pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2 ${overlay === "win" ? "animate-bounce-soft" : ""}`}
-          style={{ marginBottom: -6 }}
-        >
-          <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
-        </div>
-
-        {/* Current + next ball indicators next to Dusty (in front) */}
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
-          <BubbleSvg color={ballColor} size={32} />
-          <BubbleSvg color={nextBallColor} size={22} className="opacity-80" />
-        </div>
-
-        {/* Celebration: dancing possums next to Dusty when level is won */}
+        {/* Celebration: cartoon possums dancing alongside Dusty when level is won */}
         {overlay === "win" && (
-          <div className="pointer-events-none absolute bottom-2 left-0 right-0 z-10 flex items-end justify-center gap-3">
-            {[0, 1, 2, 3].map(i => (
-              <div
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 flex items-end justify-center gap-2 pb-1">
+            {[0, 1, 2].map(i => (
+              <img
                 key={i}
+                src={possumDanceImg}
+                alt=""
+                width={72}
+                height={72}
+                loading="lazy"
                 className="animate-bounce-soft"
-                style={{ animationDelay: `${i * 0.12}s` }}
-              >
-                <svg width="42" height="42" viewBox="-22 -22 44 44">
-                  <PossumFace />
-                </svg>
-              </div>
+                style={{
+                  width: 72,
+                  height: 72,
+                  animationDelay: `${i * 0.15}s`,
+                  transform: i % 2 === 0 ? "scaleX(-1)" : undefined,
+                }}
+              />
             ))}
           </div>
         )}
