@@ -3,7 +3,8 @@
  */
 export type BubbleColor = "red" | "blue" | "green" | "yellow" | "purple" | "pink";
 
-export const BUBBLE_COLORS: BubbleColor[] = ["red", "blue", "green", "yellow", "purple", "pink"];
+// Pink removed from selectable bubble palette (kept in type for legacy level data).
+export const BUBBLE_COLORS: BubbleColor[] = ["red", "blue", "green", "yellow", "purple"];
 
 /** Color → CSS hsl() string. Hardcoded so canvas gradients can parse them. */
 export const COLOR_HSL: Record<BubbleColor, string> = {
