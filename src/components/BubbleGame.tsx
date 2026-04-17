@@ -217,7 +217,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     grid.bubbles.push(newBubble);
 
     const cluster = findColorCluster(grid, newBubble);
-    if (cluster.length >= 3) {
+    if (cluster.length >= 2) {
       processChain(cluster);
     } else {
       tickAfterShot(false);
