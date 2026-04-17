@@ -6,11 +6,9 @@
 import type { Bubble, BubbleColor, LevelConfig } from "./types";
 import { charToBubble } from "./levels";
 
-// Default logical bubble radius (px @ 1x). The actual radius used for a level
-// is computed in `buildLevel` so the grid stretches wall-to-wall in the canvas.
-export const RADIUS = 15;
-export const DIAMETER = RADIUS * 2;
-export const ROW_HEIGHT = Math.round(DIAMETER * 0.866); // hex spacing
+// Bubble radius is computed per level in `buildLevel` so the hex grid stretches
+// wall-to-wall in whatever canvas width we're given. Renderers should read the
+// `radius`/`diameter`/`rowHeight` fields off `GridState`, never hardcode them.
 
 export interface GridState {
   bubbles: Bubble[];
