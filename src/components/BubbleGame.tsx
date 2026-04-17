@@ -40,8 +40,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     aiming: boolean;
     aimAngle: number;
     popping: Array<Bubble & { popStart: number }>;
-    falling: Array<Bubble & { vy: number }>;
+    falling: Array<Bubble & { vy: number; landed?: boolean; landedAt?: number }>;
     savedPossums: SavedPossum[];
+    particles: Particle[];
     lastTs: number;
     rafId: number;
     scrollY: number;       // current rendered offset (animated)
