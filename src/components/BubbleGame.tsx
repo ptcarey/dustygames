@@ -167,7 +167,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     const now = performance.now();
     s.popping = s.popping.filter(b => now - b.popStart < 400);
 
-    const dustyTopY = s.canvasH - 110; // approximate top of Dusty's body
+    const dustyTopY = s.canvasH - 80; // approximate top of Dusty's body (smaller)
     for (const f of s.falling) {
       if (f.landed) continue;
       f.vy += 1400 * dt;
