@@ -204,7 +204,8 @@ function generateProcedural(): LevelConfig[] {
   for (let i = 0; i < 15; i++) {
     const lvlId = 6 + i;
     const difficulty = i / 14; // 0 → 1
-    const rows = 18 + Math.floor(difficulty * 10); // 18 → 28
+    // First 3 procedural levels (6,7,8) stay small; from level 9 onward jump to 15+ rows.
+    const rows = i < 3 ? 8 + i * 2 : 15 + Math.floor((i - 3) * 0.9); // 8,10,12 → 15..25
     const colorCount = Math.min(5, 3 + Math.floor(difficulty * 3));
     const palette = BUBBLE_COLORS.slice(0, colorCount);
     const shots = Math.max(20, Math.round(rows * 1.4 - difficulty * 6));
