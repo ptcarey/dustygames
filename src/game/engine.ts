@@ -109,12 +109,20 @@ export function findColorCluster(grid: GridState, seed: Bubble): Bubble[] {
   return out;
 }
 
-/** Find all bubbles connected (any color) to the top row. Floaters are unsupported. */
+/**
+ * Find all bubbles connected (any color) to the current ceiling row.
+ * The ceiling is the topmost row that still contains bubbles — not literally
+ * row 0 — because the playfield always scrolls so the topmost remaining row
+ * sits flush under the header. Anything not reached from there is a floater.
+ */
 export function findFloaters(grid: GridState): Bubble[] {
+  if (grid.bubbles.length === 0) return [];
   const map = new Map<string, Bubble>();
   grid.bubbles.forEach(b => map.set(`${b.row},${b.col}`, b));
+  let topRow = Infinity;
+  for (const b of grid.bubbles) if (b.row < topRow) topRow = b.row;
   const supported = new Set<number>();
-  const queue: Bubble[] = grid.bubbles.filter(b => b.row === 0);
+  const queue: Bubble[] = grid.bubbles.filter(b => b.row === topRow);
   queue.forEach(b => supported.add(b.id));
   while (queue.length) {
     const cur = queue.shift()!;
