@@ -8,7 +8,7 @@ import { COLOR_HSL } from "@/game/types";
 import type { Bubble, BubbleColor, LevelConfig } from "@/game/types";
 import { Sfx, setSoundEnabled, unlockAudio } from "@/game/sound";
 import { Dusty } from "./Dusty";
-import { PossumFace } from "./BubbleSvg";
+import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 
 interface Props {
