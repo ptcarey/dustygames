@@ -62,6 +62,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
   const [possumsLeft, setPossumsLeft] = useState(0);
   const [dustyMood, setDustyMood] = useState<"idle" | "happy" | "wag">("wag");
   const [overlay, setOverlay] = useState<"win" | "lose" | null>(null);
+  const [ballColor, setBallColor] = useState<BubbleColor>("red");
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
