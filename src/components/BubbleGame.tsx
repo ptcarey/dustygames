@@ -229,10 +229,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     let chainTotal = 0;
     cluster.forEach((b, i) => {
       chainTotal += (i + 1) * 10;
-      s.popping.push({ ...b, popStart: performance.now() + i * 30 });
+      // Popping is purely visual; bake current scrollY into screen position
+      s.popping.push({ ...b, y: b.y + s.scrollY, popStart: performance.now() + i * 30 });
       setTimeout(() => Sfx.pop(i), i * 40);
       if (b.hasPossum) {
-        s.savedPossums.push({ id: b.id, x: b.x, y: b.y, born: performance.now() });
+        s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
         setPossumsLeft(pl => Math.max(0, pl - 1));
         setTimeout(() => Sfx.squeak(), i * 40 + 60);
       }
@@ -248,7 +249,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
       floaters.forEach(b => {
         bonus++;
         chainTotal += bonus * 10;
-        s.falling.push({ ...b, vy: 0 });
+        // Bake scroll offset into the falling bubble so it drops from where it visually sits
+        s.falling.push({ ...b, y: b.y + s.scrollY, vy: 0 });
       });
       setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (cluster.length + i + 1) * 10, 0));
     }
