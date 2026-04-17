@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildLevel, chainScore, findColorCluster, findFloaters,
-  pickShooterColor, RADIUS, snapToGrid, ROW_HEIGHT, DIAMETER,
+  pickShooterColor, snapToGrid,
 } from "@/game/engine";
 import type { GridState } from "@/game/engine";
 import { COLOR_HSL } from "@/game/types";
