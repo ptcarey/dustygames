@@ -110,118 +110,125 @@ function generateProcedural(): LevelConfig[] {
 
   /**
    * Pattern generators. Each returns a 2D boolean mask. All patterns ALWAYS
-   * fill the top several rows densely so bubbles start flush against the
-   * header, then build creative shapes below: diamonds, woven lattices,
-   * chevrons, hex stars, honeycomb, and webs.
+   * fill the top several rows and add hex-aware vertical "warp" threads so
+   * `pruneFloaters` keeps the whole lattice connected to the ceiling.
+   *
+   * Patterns aim for a lace / spider-web feel: dense interconnections with
+   * pleasing negative space — never sparse dangling strings.
    */
   const cols = 15;
 
   /** Fill the top `n` rows fully so the stack is anchored and visually grounded. */
-  const fillTop = (g: boolean[][], n = 2) => {
+  const fillTop = (g: boolean[][], n = 3) => {
     const limit = Math.min(n, g.length);
     for (let r = 0; r < limit; r++)
       for (let c = 0; c < cols; c++) g[r][c] = true;
   };
 
-  /** Spider-web: concentric ovals + radial spokes. */
+  /**
+   * Drop hex-connected vertical warp threads at the given column indices.
+   * Because odd rows shift right by half a bubble, the same column on odd vs
+   * even rows are still hex-neighbours, so a straight column works fine.
+   */
+  const warp = (g: boolean[][], colsAt: number[]) => {
+    const rows = g.length;
+    for (const c of colsAt) {
+      for (let r = 0; r < rows; r++) {
+        if (c >= 0 && c < cols) g[r][c] = true;
+      }
+    }
+  };
+
+  /** Spider-web: concentric ovals + 8 radial spokes from the center. */
   const makeWeb = (rows: number, density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
     const cx = (cols - 1) / 2;
     const cy = rows / 2;
-    const ringCount = 3 + Math.floor(density * 3);
+    const ringCount = 4 + Math.floor(density * 3);
     for (let k = 1; k <= ringCount; k++) {
-      const rx = (cols / 2) * (k / (ringCount + 0.5));
-      const ry = (rows / 2) * (k / (ringCount + 0.5));
+      const rx = (cols / 2) * (k / (ringCount + 0.4));
+      const ry = (rows / 2) * (k / (ringCount + 0.4));
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const dx = (c - cx) / rx;
           const dy = (r - cy) / ry;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (Math.abs(d - 1) < 0.18) g[r][c] = true;
+          if (Math.abs(d - 1) < 0.22) g[r][c] = true;
         }
       }
     }
     const spokes = 8;
     for (let s = 0; s < spokes; s++) {
       const ang = (Math.PI * 2 * s) / spokes;
-      for (let t = 0; t < Math.max(rows, cols) * 1.2; t++) {
-        const r = Math.round(cy + Math.sin(ang) * t * 0.55);
+      for (let t = 0; t < Math.max(rows, cols) * 1.4; t++) {
+        const r = Math.round(cy + Math.sin(ang) * t * 0.6);
         const c = Math.round(cx + Math.cos(ang) * t * 0.85);
         if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
       }
     }
-    fillTop(g, 2);
+    warp(g, [0, 7, 14]);
+    fillTop(g, 3);
     return g;
   };
 
-  /** Diamond lattice: tiled diamond outlines forming a rhombic mesh. */
+  /** Diamond lace: tiled solid diamonds packed edge-to-edge. */
   const makeDiamonds = (rows: number, _density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    const size = 4;
-    for (let cy0 = 0; cy0 < rows + size; cy0 += size) {
-      for (let cx0 = -size; cx0 < cols + size; cx0 += size) {
+    const size = 3;
+    for (let cy0 = 0; cy0 < rows + size; cy0 += size + 1) {
+      for (let cx0 = 0; cx0 < cols + size; cx0 += size + 1) {
         for (let dr = -size; dr <= size; dr++) {
-          const dc = size - Math.abs(dr);
-          for (const c of [cx0 + dc, cx0 - dc]) {
-            const r = cy0 + dr;
+          const span = size - Math.abs(dr);
+          for (let dc = -span; dc <= span; dc++) {
+            const r = cy0 + dr, c = cx0 + dc;
             if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
           }
         }
       }
     }
-    fillTop(g, 2);
+    warp(g, [0, 4, 8, 12, 14]);
+    fillTop(g, 3);
     return g;
   };
 
-  /** Woven lattice: two crossing sine waves + vertical warp threads. */
-  const makeWeave = (rows: number, density: number): boolean[][] => {
+  /** Woven lattice: alternating warp + weft like a basket weave. */
+  const makeWeave = (rows: number, _density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    const amp = 2.5;
-    const period = 6;
-    for (let c = 0; c < cols; c++) {
-      const r1 = Math.round(rows / 2 + Math.sin((c / period) * Math.PI * 2) * amp);
-      const r2 = Math.round(rows / 2 + Math.cos((c / period) * Math.PI * 2) * amp);
-      for (const rc of [r1 - 1, r1, r1 + 1]) if (rc >= 0 && rc < rows) g[rc][c] = true;
-      for (const rc of [r2 - 1, r2, r2 + 1]) if (rc >= 0 && rc < rows) g[rc][c] = true;
+    for (let r = 0; r < rows; r += 3) {
+      for (let c = 0; c < cols; c++) g[r][c] = true;
     }
-    for (let c = 0; c < cols; c += 2)
-      for (let r = 0; r < rows; r++) g[r][c] = true;
-    const bands = 2 + Math.floor(density * 3);
-    for (let i = 0; i < bands; i++) {
-      const r = rows - 2 - i * 2;
-      if (r > 2) for (let c = 0; c < cols; c++) if ((c + i) % 2 === 0) g[r][c] = true;
-    }
-    fillTop(g, 2);
+    warp(g, [0, 2, 4, 6, 8, 10, 12, 14]);
+    fillTop(g, 3);
     return g;
   };
 
-  /** Chevrons: stacked V-shapes pointing down across the field. */
+  /** Chevron lace: dense V-shapes layered with thicker arms. */
   const makeChevrons = (rows: number, _density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
     const span = Math.floor(cols / 2);
-    for (let r0 = 0; r0 < rows; r0 += 4) {
+    for (let r0 = 0; r0 < rows; r0 += 3) {
       for (let k = 0; k <= span; k++) {
         const r = r0 + k;
         if (r >= rows) break;
         const left = span - k;
         const right = span + k;
-        if (left >= 0 && left < cols) g[r][left] = true;
-        if (right >= 0 && right < cols) g[r][right] = true;
+        for (const c of [left, left + 1, right - 1, right]) {
+          if (c >= 0 && c < cols) g[r][c] = true;
+        }
       }
     }
-    for (let r = 0; r < rows; r++) g[r][Math.floor(cols / 2)] = true;
-    fillTop(g, 2);
+    warp(g, [0, 7, 14]);
+    fillTop(g, 3);
     return g;
   };
 
-  /** Hex star bursts: radiating six-point star tiles. */
+  /** Hex star lace: tiled six-point stars connected by warp threads. */
   const makeStars = (rows: number, _density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    const stamp = ["..x..", ".xxx.", "xxxxx", ".xxx.", "..x.."];
-    const sw = stamp[0].length;
-    const sh = stamp.length;
-    for (let r0 = 0; r0 < rows; r0 += sh + 1) {
-      for (let c0 = 0; c0 < cols; c0 += sw + 1) {
+    const stamp = [".xxx.", "xxxxx", "xxxxx", "xxxxx", ".xxx."];
+    const sw = stamp[0].length, sh = stamp.length;
+    for (let r0 = 0; r0 < rows; r0 += sh) {
+      for (let c0 = 0; c0 < cols; c0 += sw) {
         for (let r = 0; r < sh; r++) for (let c = 0; c < sw; c++) {
           if (stamp[r][c] === "x") {
             const rr = r0 + r, cc = c0 + c;
@@ -230,20 +237,19 @@ function generateProcedural(): LevelConfig[] {
         }
       }
     }
-    for (let c = 2; c < cols; c += 6) for (let r = 0; r < rows; r++) g[r][c] = true;
-    fillTop(g, 2);
+    warp(g, [0, 5, 10, 14]);
+    fillTop(g, 3);
     return g;
   };
 
-  /** Honeycomb: dense hex packing with periodic empty cells for texture. */
+  /** Honeycomb lace: dense fill with regular hex-shaped holes. */
   const makeHoneycomb = (rows: number, _density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(true));
-    for (let r = 1; r < rows; r += 3) {
-      for (let c = (r % 6 === 1 ? 1 : 3); c < cols; c += 4) {
-        g[r][c] = false;
-      }
+    for (let r = 2; r < rows; r += 3) {
+      const offset = (r / 3) % 2 === 0 ? 2 : 4;
+      for (let c = offset; c < cols; c += 4) g[r][c] = false;
     }
-    fillTop(g, 2);
+    fillTop(g, 3);
     return g;
   };
 
