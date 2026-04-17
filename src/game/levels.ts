@@ -289,7 +289,11 @@ function generateProcedural(): LevelConfig[] {
     }
     const grid: string[] = colorGrid.map(row => row.join(""));
 
-    // Sprinkle possums into deeper non-empty cells.
+    // Prune floaters FIRST so possums can only land on cells that actually
+    // survive in the final grid (otherwise possums silently disappear).
+    pruneFloaters(grid, cols);
+
+    // Sprinkle possums into deeper surviving cells.
     const cells: Array<[number, number]> = [];
     grid.forEach((row, r) =>
       row.split("").forEach((ch, c) => { if (ch !== ".") cells.push([r, c]); })
@@ -304,10 +308,16 @@ function generateProcedural(): LevelConfig[] {
       grid[r] = arr.join("");
     }
 
-    pruneFloaters(grid, cols);
-
-    // Restrict shooter palette to colors that actually survived in the grid.
-    const shooterColors = palette.filter(c => used.has(c));
+    // Recompute which colors actually appear in the final grid (after pruning).
+    const finalUsed = new Set<BubbleColor>();
+    for (const row of grid) {
+      for (const ch of row) {
+        const data = ch === "." ? null : { color: (["red","blue","green","yellow","purple"] as BubbleColor[]).find(c => c[0] === ch.toLowerCase()) };
+        if (data?.color) finalUsed.add(data.color);
+      }
+    }
+    const shooterColors = palette.filter(c => finalUsed.has(c));
+    void used;
 
     levels.push({
       id: lvlId,
