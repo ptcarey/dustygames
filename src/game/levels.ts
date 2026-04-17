@@ -7,7 +7,9 @@ import { BUBBLE_COLORS } from "./types";
  *   UPPERCASE same letter = bubble containing a trapped possum
  */
 const CHAR_TO_COLOR: Record<string, BubbleColor> = {
-  r: "red", b: "blue", g: "green", y: "yellow", p: "purple", k: "pink",
+  r: "red", b: "blue", g: "green", y: "yellow", p: "purple",
+  // Pink removed — legacy 'k' chars now map to purple so old level data stays playable.
+  k: "purple",
 };
 
 export function charToBubble(ch: string): { color: BubbleColor; possum: boolean } | null {
@@ -46,7 +48,7 @@ const HANDCRAFTED: LevelConfig[] = [
   },
   {
     id: 3, name: "Possum Party", shots: 18, cols: 15,
-    shooterColors: ["red", "blue", "green", "yellow", "pink"],
+    shooterColors: ["red", "blue", "green", "yellow", "purple"],
     grid: [
       "rk.ygk.bygk.byk",
       "yg.bky.rbk.grbK",
@@ -69,7 +71,7 @@ const HANDCRAFTED: LevelConfig[] = [
   },
   {
     id: 5, name: "Big Brave Heart", shots: 24, cols: 15,
-    shooterColors: ["red", "blue", "yellow", "purple", "pink"],
+    shooterColors: ["red", "blue", "yellow", "purple"],
     grid: [
       "pp.yyp.rrk.yybp",
       "yp.RRp.yyk.bbpy",
@@ -104,7 +106,7 @@ function generateProcedural(): LevelConfig[] {
     "Big Cuddle", "Final Friends", "Hero Dusty",
   ];
 
-  const colorChar = (c: BubbleColor) => (c === "pink" ? "k" : c[0]);
+  const colorChar = (c: BubbleColor) => c[0];
 
   for (let i = 0; i < 15; i++) {
     const lvlId = 6 + i;
