@@ -76,6 +76,7 @@ const Index = () => {
           audioEnabled={save.audioEnabled}
           onWin={handleWin}
           onLose={handleLose}
+          onNext={handleNext}
           onExit={() => setScreen("levels")}
         />
       )}
