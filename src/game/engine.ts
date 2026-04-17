@@ -6,7 +6,9 @@
 import type { Bubble, BubbleColor, LevelConfig } from "./types";
 import { charToBubble } from "./levels";
 
-export const RADIUS = 15;          // logical bubble radius (px @ 1x) — 30% smaller
+// Default logical bubble radius (px @ 1x). The actual radius used for a level
+// is computed in `buildLevel` so the grid stretches wall-to-wall in the canvas.
+export const RADIUS = 15;
 export const DIAMETER = RADIUS * 2;
 export const ROW_HEIGHT = Math.round(DIAMETER * 0.866); // hex spacing
 
@@ -14,6 +16,10 @@ export interface GridState {
   bubbles: Bubble[];
   cols: number;
   width: number;
+  /** Per-grid bubble radius (scales with canvas width so bubbles fill wall-to-wall). */
+  radius: number;
+  diameter: number;
+  rowHeight: number;
   /** Pixel y at which a bubble in row r sits. */
   rowY: (row: number) => number;
   /** Pixel x at which a bubble in (row, col) sits. */
@@ -24,14 +30,19 @@ let nextId = 1;
 
 export function buildLevel(level: LevelConfig, canvasWidth: number): GridState {
   const cols = level.cols;
-  // Reserve a little side padding so bubbles don't touch the wall
-  const sidePad = 6;
-  const offsetX = sidePad + RADIUS;
-  const offsetY = RADIUS + 8;
+  // Stretch bubbles wall-to-wall: 15 columns of diameter D plus tiny side gap.
+  // Even rows have `cols` bubbles centered at offsetX + col*D.
+  // We want leftmost edge at 0 and rightmost edge at canvasWidth.
+  const sidePad = 1;
+  const diameter = (canvasWidth - sidePad * 2) / cols;
+  const radius = diameter / 2;
+  const rowHeight = diameter * 0.866;
+  const offsetX = sidePad + radius;
+  const offsetY = radius + 8;
 
   const colX = (row: number, col: number) =>
-    offsetX + col * DIAMETER + (row % 2 === 1 ? RADIUS : 0);
-  const rowY = (row: number) => offsetY + row * ROW_HEIGHT;
+    offsetX + col * diameter + (row % 2 === 1 ? radius : 0);
+  const rowY = (row: number) => offsetY + row * rowHeight;
 
   const bubbles: Bubble[] = [];
   level.grid.forEach((rowStr, r) => {
@@ -53,7 +64,7 @@ export function buildLevel(level: LevelConfig, canvasWidth: number): GridState {
     }
   });
 
-  return { bubbles, cols, width: canvasWidth, rowY, colX };
+  return { bubbles, cols, width: canvasWidth, radius, diameter, rowHeight, rowY, colX };
 }
 
 /** Find the 6 hex neighbor (row,col) coords. */
@@ -71,10 +82,10 @@ export function neighborsOf(row: number, col: number): Array<[number, number]> {
 
 /** Snap a free bubble (x,y) to nearest empty grid cell, returning {row,col}. */
 export function snapToGrid(grid: GridState, x: number, y: number): { row: number; col: number } {
-  const row = Math.max(0, Math.round((y - RADIUS - 8) / ROW_HEIGHT));
+  const row = Math.max(0, Math.round((y - grid.radius - 8) / grid.rowHeight));
   const odd = row % 2 === 1;
   const offsetX = grid.colX(0, 0);
-  let col = Math.round((x - offsetX - (odd ? RADIUS : 0)) / DIAMETER);
+  let col = Math.round((x - offsetX - (odd ? grid.radius : 0)) / grid.diameter);
   col = Math.max(0, Math.min(grid.cols - (odd ? 2 : 1), col));
   return { row, col };
 }
@@ -120,10 +131,7 @@ export function findFloaters(grid: GridState): Bubble[] {
   return grid.bubbles.filter(b => !supported.has(b.id));
 }
 
-/**
- * Combo scoring: 10, 20, 30, 40, ... per pop in same chain.
- * Returns total score for a chain of `count` pops.
- */
+/** Combo scoring: 10, 20, 30, 40, ... per pop in same chain. */
 export function chainScore(count: number): number {
   let total = 0;
   for (let i = 1; i <= count; i++) total += i * 10;
