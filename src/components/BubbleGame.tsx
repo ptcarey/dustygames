@@ -16,6 +16,7 @@ interface Props {
   audioEnabled: boolean;
   onWin: (score: number) => void;
   onLose: () => void;
+  onNext: () => void;
   onExit: () => void;
 }
 
