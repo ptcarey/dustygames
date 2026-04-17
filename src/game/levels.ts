@@ -27,9 +27,9 @@ const HANDCRAFTED: LevelConfig[] = [
     id: 1, name: "Hello Dusty!", shots: 14, cols: 15,
     shooterColors: ["red", "blue", "yellow"],
     grid: [
-      "rrbbyyrrbbyyrrb",
-      "byyrrbbyyrrbbyy",
-      "rbybryyBrybyrby",
+      "rr.byyr.bby.rrb",
+      "by.rrb.yyr.bbyy",
+      "rby.ryyB.ybyrby",
       "...rby...rby...",
     ],
   },
@@ -37,9 +37,9 @@ const HANDCRAFTED: LevelConfig[] = [
     id: 2, name: "First Friend", shots: 16, cols: 15,
     shooterColors: ["red", "blue", "green", "yellow"],
     grid: [
-      "rgbygrgbygrgbyr",
-      "byrgbygrbygrbyg",
-      "grybGgrybyrgryb",
+      "rg.ygrg.ygrg.yr",
+      "by.gby.rby.rb.g",
+      "gr.bGgr.byrg.yb",
       "rb.yg.br.yg.rby",
       "...g.b.r.y.....",
     ],
@@ -48,10 +48,10 @@ const HANDCRAFTED: LevelConfig[] = [
     id: 3, name: "Possum Party", shots: 18, cols: 15,
     shooterColors: ["red", "blue", "green", "yellow", "pink"],
     grid: [
-      "rkbygkrbygkrbyk",
-      "ygrbkygrbkygrbK",
-      "bRygkbrygkbrygk",
-      "gybrkgybrkGybrk",
+      "rk.ygk.bygk.byk",
+      "yg.bky.rbk.grbK",
+      "bR.gkb.ygk.bygk",
+      "gy.rkg.brkGybrk",
       "..yk..rb..yg..k",
     ],
   },
@@ -59,10 +59,10 @@ const HANDCRAFTED: LevelConfig[] = [
     id: 4, name: "Rainbow Rescue", shots: 20, cols: 15,
     shooterColors: BUBBLE_COLORS,
     grid: [
-      "rbgykprbgykprbg",
-      "pkygbrPkygbrpky",
-      "gybkprgybkprgyb",
-      "rkpbygrkpbygrkP",
+      "rb.ykp.bgyk.rbg",
+      "pk.gbrPky.brpky",
+      "gy.kprg.bkprgyb",
+      "rk.bygr.bygrk.P",
       "by.gk.rp.bg.yk.",
       "..r.b.g.y.k.p..",
     ],
@@ -71,11 +71,11 @@ const HANDCRAFTED: LevelConfig[] = [
     id: 5, name: "Big Brave Heart", shots: 24, cols: 15,
     shooterColors: ["red", "blue", "yellow", "purple", "pink"],
     grid: [
-      "ppyypprrkkyybbp",
-      "yppRRppyykkbbpy",
-      "ypprrppykkbbppy",
-      "yppKKppyybbppyy",
-      "ypprrppyykkbbpy",
+      "pp.yyp.rrk.yybp",
+      "yp.RRp.yyk.bbpy",
+      "yp.rrp.ykk.bbpy",
+      "yp.KKp.yyb.bppy",
+      "yp.rrp.yyk.bbpy",
       "..yp..yk..bp..y",
       "....rr....bb...",
       "......YY.......",
@@ -130,8 +130,8 @@ function generateProcedural(): LevelConfig[] {
           curColor = next;
           runLeft = 2 + Math.floor(rand() * 3);
         }
-        // Sprinkle some gaps so some clusters are not tethered → they fall
-        if (rand() < 0.06 + difficulty * 0.1) {
+        // Sprinkle more gaps so balls can sometimes slip through to deeper rows
+        if (rand() < 0.14 + difficulty * 0.12) {
           row += ".";
         } else {
           row += colorChar(curColor);
