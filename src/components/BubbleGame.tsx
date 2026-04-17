@@ -251,7 +251,23 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     cluster.forEach((b, i) => {
       chainTotal += (i + 1) * 10;
       // Popping is purely visual; bake current scrollY into screen position
-      s.popping.push({ ...b, y: b.y + s.scrollY, popStart: performance.now() + i * 30 });
+      const px = b.x, py = b.y + s.scrollY;
+      s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
+      // Spawn explosion particles
+      const pieces = 8;
+      for (let k = 0; k < pieces; k++) {
+        const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
+        const speed = 120 + Math.random() * 160;
+        s.particles.push({
+          x: px, y: py,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 60,
+          color: b.color,
+          born: performance.now() + i * 30,
+          life: 600 + Math.random() * 200,
+          size: 3 + Math.random() * 3,
+        });
+      }
       setTimeout(() => Sfx.pop(i), i * 40);
       if (b.hasPossum) {
         s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
