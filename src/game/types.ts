@@ -5,14 +5,14 @@ export type BubbleColor = "red" | "blue" | "green" | "yellow" | "purple" | "pink
 
 export const BUBBLE_COLORS: BubbleColor[] = ["red", "blue", "green", "yellow", "purple", "pink"];
 
-/** Color → CSS hsl() string from design tokens. */
+/** Color → CSS hsl() string. Hardcoded so canvas gradients can parse them. */
 export const COLOR_HSL: Record<BubbleColor, string> = {
-  red: "hsl(var(--bubble-red))",
-  blue: "hsl(var(--bubble-blue))",
-  green: "hsl(var(--bubble-green))",
-  yellow: "hsl(var(--bubble-yellow))",
-  purple: "hsl(var(--bubble-purple))",
-  pink: "hsl(var(--bubble-pink))",
+  red: "hsl(0, 85%, 65%)",
+  blue: "hsl(210, 90%, 65%)",
+  green: "hsl(140, 65%, 55%)",
+  yellow: "hsl(48, 95%, 60%)",
+  purple: "hsl(280, 70%, 68%)",
+  pink: "hsl(330, 85%, 72%)",
 };
 
 /** A single bubble in the grid (or projectile). */
