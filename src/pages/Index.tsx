@@ -27,13 +27,15 @@ const Index = () => {
     setHighScore(score);
     const next = Math.min(TOTAL_LEVELS, currentLevelId + 1);
     unlockLevel(next);
-    const updated = loadSave();
-    setSave(updated);
+    setSave(loadSave());
+  };
+
+  const handleNext = () => {
+    const next = Math.min(TOTAL_LEVELS, currentLevelId + 1);
     if (currentLevelId < TOTAL_LEVELS) {
-      // brief delay then start next level
-      setTimeout(() => startLevel(next), 600);
+      startLevel(next);
     } else {
-      setTimeout(() => setScreen("levels"), 800);
+      setScreen("levels");
     }
   };
 
@@ -74,6 +76,7 @@ const Index = () => {
           audioEnabled={save.audioEnabled}
           onWin={handleWin}
           onLose={handleLose}
+          onNext={handleNext}
           onExit={() => setScreen("levels")}
         />
       )}

@@ -16,6 +16,7 @@ interface Props {
   audioEnabled: boolean;
   onWin: (score: number) => void;
   onLose: () => void;
+  onNext: () => void;
   onExit: () => void;
 }
 
@@ -24,7 +25,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
-export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props) {
+export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -92,7 +93,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.grid = grid;
     s.canvasW = w; s.canvasH = h; s.dpr = dpr;
     s.shooterX = w / 2;
-    s.shooterY = h - 80;
+    s.shooterY = h - 60;
     s.currentColor = pickShooterColor(grid, level);
     s.nextColor = pickShooterColor(grid, level);
     setBallColor(s.currentColor);
@@ -166,7 +167,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     const now = performance.now();
     s.popping = s.popping.filter(b => now - b.popStart < 400);
 
-    const dustyTopY = s.canvasH - 110; // approximate top of Dusty's body
+    const dustyTopY = s.canvasH - 80; // approximate top of Dusty's body (smaller)
     for (const f of s.falling) {
       if (f.landed) continue;
       f.vy += 1400 * dt;
@@ -312,6 +313,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
   const checkEnd = (shots: number) => {
     const s = stateRef.current;
     const grid = s.grid!;
+    if (overlayRef.current) return;
     const remainingPossums = grid.bubbles.filter(b => b.hasPossum).length
       + s.falling.filter(b => b.hasPossum).length;
     if (remainingPossums === 0) {
@@ -329,6 +331,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
 
   const scoreRef = useRef(0);
   useEffect(() => { scoreRef.current = score; }, [score]);
+  const overlayRef = useRef<typeof overlay>(null);
+  useEffect(() => { overlayRef.current = overlay; }, [overlay]);
 
   const draw = () => {
     const canvas = canvasRef.current;
@@ -554,9 +558,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
   void colorChip;
 
   return (
-    <div className="relative h-full w-full overflow-hidden flex">
+    <div className="relative h-full w-full overflow-hidden">
       {/* Playfield */}
-      <div ref={containerRef} className="relative flex-1 h-full">
+      <div ref={containerRef} className="relative h-full w-full">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 touch-none"
@@ -566,44 +570,69 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
           onPointerCancel={onPointerUp}
         />
 
-        <div className="pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2" style={{ marginBottom: -10 }}>
-          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
+        {/* HUD — inside the playfield, top-right, stacked top→bottom */}
+        <div className="pointer-events-auto absolute right-1.5 top-1.5 z-10 flex w-16 flex-col items-stretch gap-1.5">
+          <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Score</div>
+            <div className="text-base font-bold leading-tight text-foreground">{score}</div>
+          </div>
+          <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Shots</div>
+            <div className="text-base font-bold leading-tight text-primary">{shotsLeft}</div>
+          </div>
+          <div className="flex w-full items-center justify-center gap-1 rounded-xl bg-white/85 px-2 py-1 shadow-md backdrop-blur">
+            <svg width="16" height="16" viewBox="-22 -22 44 44">
+              <PossumFace />
+            </svg>
+            <span className="text-sm font-bold leading-none">{possumsLeft}</span>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={onExit}
+            aria-label="Back to menu"
+            className="h-7 w-full rounded-xl px-2 text-xs"
+          >
+            Menu
+          </Button>
+        </div>
+
+        <div
+          className={`pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2 ${overlay === "win" ? "animate-bounce-soft" : ""}`}
+          style={{ marginBottom: -6 }}
+        >
+          <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
         </div>
 
         {/* Current + next ball indicators next to Dusty (in front) */}
-        <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
-          <BubbleSvg color={ballColor} size={42} />
-          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
+          <BubbleSvg color={ballColor} size={32} />
+          <BubbleSvg color={nextBallColor} size={22} className="opacity-80" />
         </div>
-      </div>
 
-      {/* Side panel — outside the playfield, stacked from bottom up */}
-      <div className="flex w-24 flex-col-reverse items-stretch gap-2 p-2 sm:w-28">
-        <Button variant="secondary" onClick={onExit} aria-label="Back to menu" className="w-full">
-          Menu
-        </Button>
-        <div className="flex w-full items-center justify-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
-          <svg width="22" height="22" viewBox="-22 -22 44 44">
-            <PossumFace />
-          </svg>
-          <span className="text-lg font-bold">{possumsLeft}</span>
-        </div>
-        <div className="w-full rounded-2xl bg-white/85 px-3 py-2 text-center shadow-md backdrop-blur">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
-          <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
-        </div>
-        <div className="w-full rounded-2xl bg-white/85 px-3 py-2 text-center shadow-md backdrop-blur">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
-          <div className="text-2xl font-bold text-foreground">{score}</div>
-        </div>
+        {/* Celebration: dancing possums next to Dusty when level is won */}
+        {overlay === "win" && (
+          <div className="pointer-events-none absolute bottom-2 left-0 right-0 z-10 flex items-end justify-center gap-3">
+            {[0, 1, 2, 3].map(i => (
+              <div
+                key={i}
+                className="animate-bounce-soft"
+                style={{ animationDelay: `${i * 0.12}s` }}
+              >
+                <svg width="42" height="42" viewBox="-22 -22 44 44">
+                  <PossumFace />
+                </svg>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {overlay === "win" && (
         <Overlay
           title="🎉 You saved them all!"
           subtitle={`Score: ${score}`}
-          ctaLabel="Next →"
-          onCta={() => onWinRef.current(score)}
+          ctaLabel="Next Level →"
+          onCta={onNext}
         />
       )}
       {overlay === "lose" && (
@@ -623,10 +652,10 @@ function Overlay({
   title, subtitle, ctaLabel, onCta, onSecondary,
 }: { title: string; subtitle: string; ctaLabel: string; onCta: () => void; onSecondary?: () => void }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-foreground/50 backdrop-blur-sm animate-bounce-soft">
-      <div className="w-[80%] max-w-sm rounded-3xl bg-card p-6 text-center shadow-2xl">
-        <h2 className="mb-2 text-3xl font-bold text-foreground">{title}</h2>
-        <p className="mb-6 text-lg text-muted-foreground">{subtitle}</p>
+    <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center pt-10 animate-bounce-soft">
+      <div className="pointer-events-auto w-[80%] max-w-sm rounded-3xl bg-card/95 p-5 text-center shadow-2xl backdrop-blur">
+        <h2 className="mb-2 text-2xl font-bold text-foreground">{title}</h2>
+        <p className="mb-5 text-base text-muted-foreground">{subtitle}</p>
         <div className="flex flex-col gap-3">
           <button className="kid-button" onClick={onCta}>{ctaLabel}</button>
           {onSecondary && (
