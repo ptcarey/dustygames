@@ -93,6 +93,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onExit }: Props
     s.nextColor = pickShooterColor(grid, level);
     s.projectile = null;
     s.popping = []; s.falling = []; s.savedPossums = [];
+    s.scrollY = 0; s.targetScrollY = 0;
 
     setShotsLeft(level.shots);
     setScore(0);
