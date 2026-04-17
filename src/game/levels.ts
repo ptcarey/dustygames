@@ -109,17 +109,21 @@ function generateProcedural(): LevelConfig[] {
   const colorChar = (c: BubbleColor) => c[0];
 
   /**
-   * Lace / spider-web style generators. Each returns a 2D boolean grid
-   * marking which cells should hold a bubble. Colors are layered on after.
+   * Pattern generators. Each returns a 2D boolean mask. All patterns ALWAYS
+   * fill the top several rows densely so bubbles start flush against the
+   * header, then build creative shapes below: diamonds, woven lattices,
+   * chevrons, hex stars, honeycomb, and webs.
    */
   const cols = 15;
 
-  /** Fill the very top row so patterns stay anchored after pruneFloaters. */
-  const anchorTop = (g: boolean[][]) => {
-    for (let c = 0; c < cols; c++) g[0][c] = true;
+  /** Fill the top `n` rows fully so the stack is anchored and visually grounded. */
+  const fillTop = (g: boolean[][], n = 2) => {
+    const limit = Math.min(n, g.length);
+    for (let r = 0; r < limit; r++)
+      for (let c = 0; c < cols; c++) g[r][c] = true;
   };
 
-  /** Spider-web: concentric oval "threads" plus radial spokes from the center. */
+  /** Spider-web: concentric ovals + radial spokes. */
   const makeWeb = (rows: number, density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
     const cx = (cols - 1) / 2;
@@ -133,11 +137,10 @@ function generateProcedural(): LevelConfig[] {
           const dx = (c - cx) / rx;
           const dy = (r - cy) / ry;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (Math.abs(d - 1) < 0.12) g[r][c] = true;
+          if (Math.abs(d - 1) < 0.18) g[r][c] = true;
         }
       }
     }
-    // Spokes — radial threads from the center outward, anchoring the rings to the top.
     const spokes = 8;
     for (let s = 0; s < spokes; s++) {
       const ang = (Math.PI * 2 * s) / spokes;
@@ -147,63 +150,104 @@ function generateProcedural(): LevelConfig[] {
         if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
       }
     }
-    anchorTop(g);
+    fillTop(g, 2);
     return g;
   };
 
-  /** Lace: tiled diamond stamp + a few small lumps for organic variety. */
-  const makeLace = (rows: number, density: number): boolean[][] => {
+  /** Diamond lattice: tiled diamond outlines forming a rhombic mesh. */
+  const makeDiamonds = (rows: number, _density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    const stamp = ["..x..", ".x.x.", "x.x.x", ".x.x.", "..x.."];
-    const sw = stamp[0].length;
-    const sh = stamp.length;
-    for (let r0 = 0; r0 < rows; r0 += sh - 1) {
-      for (let c0 = -2; c0 < cols; c0 += sw - 1) {
-        for (let r = 0; r < sh; r++) {
-          for (let c = 0; c < sw; c++) {
-            if (stamp[r][c] === "x") {
-              const rr = r0 + r;
-              const cc = c0 + c;
-              if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) g[rr][cc] = true;
-            }
+    const size = 4;
+    for (let cy0 = 0; cy0 < rows + size; cy0 += size) {
+      for (let cx0 = -size; cx0 < cols + size; cx0 += size) {
+        for (let dr = -size; dr <= size; dr++) {
+          const dc = size - Math.abs(dr);
+          for (const c of [cx0 + dc, cx0 - dc]) {
+            const r = cy0 + dr;
+            if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
           }
         }
       }
     }
-    const lumps = 2 + Math.floor(density * 4);
-    for (let i = 0; i < lumps; i++) {
-      const r = Math.floor(rand() * (rows - 2));
-      const c = Math.floor(rand() * (cols - 2));
-      g[r][c] = true; g[r][c + 1] = true;
-      g[r + 1][c] = true; g[r + 1][c + 1] = true;
-    }
-    anchorTop(g);
+    fillTop(g, 2);
     return g;
   };
 
-  /** Zigzag: alternating lace bands tied together with vertical "drop" threads. */
-  const makeZigzag = (rows: number, density: number): boolean[][] => {
+  /** Woven lattice: two crossing sine waves + vertical warp threads. */
+  const makeWeave = (rows: number, density: number): boolean[][] => {
     const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-    for (let r = 0; r < rows; r++) {
-      const band = r % 4;
-      for (let c = 0; c < cols; c++) {
-        if (band === 0 && (c + r) % 2 === 0) g[r][c] = true;
-        else if (band === 2 && c % 3 === (r % 3)) g[r][c] = true;
-      }
+    const amp = 2.5;
+    const period = 6;
+    for (let c = 0; c < cols; c++) {
+      const r1 = Math.round(rows / 2 + Math.sin((c / period) * Math.PI * 2) * amp);
+      const r2 = Math.round(rows / 2 + Math.cos((c / period) * Math.PI * 2) * amp);
+      for (const rc of [r1 - 1, r1, r1 + 1]) if (rc >= 0 && rc < rows) g[rc][c] = true;
+      for (const rc of [r2 - 1, r2, r2 + 1]) if (rc >= 0 && rc < rows) g[rc][c] = true;
     }
-    // Vertical drop-threads keep the lower bands connected to the top.
-    for (let c = 1; c < cols; c += 3) {
+    for (let c = 0; c < cols; c += 2)
       for (let r = 0; r < rows; r++) g[r][c] = true;
+    const bands = 2 + Math.floor(density * 3);
+    for (let i = 0; i < bands; i++) {
+      const r = rows - 2 - i * 2;
+      if (r > 2) for (let c = 0; c < cols; c++) if ((c + i) % 2 === 0) g[r][c] = true;
     }
-    const lumps = 3 + Math.floor(density * 4);
-    for (let i = 0; i < lumps; i++) {
-      const r = Math.floor(rand() * (rows - 1));
-      const c = Math.floor(rand() * (cols - 1));
-      g[r][c] = true; g[r][c + 1] = true; g[r + 1][c] = true;
-    }
-    anchorTop(g);
+    fillTop(g, 2);
     return g;
   };
+
+  /** Chevrons: stacked V-shapes pointing down across the field. */
+  const makeChevrons = (rows: number, _density: number): boolean[][] => {
+    const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const span = Math.floor(cols / 2);
+    for (let r0 = 0; r0 < rows; r0 += 4) {
+      for (let k = 0; k <= span; k++) {
+        const r = r0 + k;
+        if (r >= rows) break;
+        const left = span - k;
+        const right = span + k;
+        if (left >= 0 && left < cols) g[r][left] = true;
+        if (right >= 0 && right < cols) g[r][right] = true;
+      }
+    }
+    for (let r = 0; r < rows; r++) g[r][Math.floor(cols / 2)] = true;
+    fillTop(g, 2);
+    return g;
+  };
+
+  /** Hex star bursts: radiating six-point star tiles. */
+  const makeStars = (rows: number, _density: number): boolean[][] => {
+    const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const stamp = ["..x..", ".xxx.", "xxxxx", ".xxx.", "..x.."];
+    const sw = stamp[0].length;
+    const sh = stamp.length;
+    for (let r0 = 0; r0 < rows; r0 += sh + 1) {
+      for (let c0 = 0; c0 < cols; c0 += sw + 1) {
+        for (let r = 0; r < sh; r++) for (let c = 0; c < sw; c++) {
+          if (stamp[r][c] === "x") {
+            const rr = r0 + r, cc = c0 + c;
+            if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) g[rr][cc] = true;
+          }
+        }
+      }
+    }
+    for (let c = 2; c < cols; c += 6) for (let r = 0; r < rows; r++) g[r][c] = true;
+    fillTop(g, 2);
+    return g;
+  };
+
+  /** Honeycomb: dense hex packing with periodic empty cells for texture. */
+  const makeHoneycomb = (rows: number, _density: number): boolean[][] => {
+    const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(true));
+    for (let r = 1; r < rows; r += 3) {
+      for (let c = (r % 6 === 1 ? 1 : 3); c < cols; c += 4) {
+        g[r][c] = false;
+      }
+    }
+    fillTop(g, 2);
+    return g;
+  };
+
+  const PATTERNS = [makeWeb, makeDiamonds, makeWeave, makeChevrons, makeStars, makeHoneycomb];
 
   for (let i = 0; i < 15; i++) {
     const lvlId = 6 + i;
