@@ -140,7 +140,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     const VISIBLE_ROWS = 15;
     let maxRow = 0;
     for (const b of grid.bubbles) if (b.row > maxRow) maxRow = b.row;
-    s.targetScrollY = (VISIBLE_ROWS - 1 - maxRow) * ROW_HEIGHT;
+    s.targetScrollY = (VISIBLE_ROWS - 1 - maxRow) * grid.rowHeight;
     if (s.targetScrollY > 0) s.targetScrollY = 0; // never push above natural top
     // Smoothly approach target
     const diff = s.targetScrollY - s.scrollY;
@@ -150,14 +150,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
       const p = s.projectile;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (p.x < RADIUS) { p.x = RADIUS; p.vx = -p.vx; }
-      if (p.x > s.canvasW - RADIUS) { p.x = s.canvasW - RADIUS; p.vx = -p.vx; }
+      if (p.x < grid.radius) { p.x = grid.radius; p.vx = -p.vx; }
+      if (p.x > s.canvasW - grid.radius) { p.x = s.canvasW - grid.radius; p.vx = -p.vx; }
 
       let hit = false;
-      if (p.y <= RADIUS + 8) hit = true;
+      if (p.y <= grid.radius + 8) hit = true;
       for (const b of grid.bubbles) {
         const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
-        if (dx * dx + dy * dy < (DIAMETER * 0.92) ** 2) { hit = true; break; }
+        if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
       }
       if (hit) {
         landProjectile(p);
@@ -427,7 +427,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     ctx: CanvasRenderingContext2D,
     x: number, y: number, color: BubbleColor, possum: boolean, scale = 1,
   ) => {
-    const r = RADIUS * scale;
+    const r = (stateRef.current.grid?.radius ?? 15) * scale;
     const grad = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
     grad.addColorStop(0, "rgba(255,255,255,0.95)");
     grad.addColorStop(0.4, COLOR_HSL[color]);
@@ -476,8 +476,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     const grid = s.grid!;
     while (segments < 6 && remaining > 4 && y > 30) {
       let tWall = Infinity;
-      if (vx < 0) tWall = (RADIUS - x) / vx;
-      else if (vx > 0) tWall = (s.canvasW - RADIUS - x) / vx;
+      if (vx < 0) tWall = (grid.radius - x) / vx;
+      else if (vx > 0) tWall = (s.canvasW - grid.radius - x) / vx;
       let tHit = Infinity;
       for (const b of grid.bubbles) {
         const by = b.y + s.scrollY;
@@ -485,12 +485,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
         const dot = dx * vx + dy * vy;
         if (dot <= 0) continue;
         const closest = Math.sqrt(Math.max(0, dx * dx + dy * dy - dot * dot));
-        if (closest < DIAMETER * 0.95) {
-          const t = dot - Math.sqrt((DIAMETER * 0.95) ** 2 - closest * closest);
+        if (closest < grid.diameter * 0.95) {
+          const t = dot - Math.sqrt((grid.diameter * 0.95) ** 2 - closest * closest);
           if (t < tHit) tHit = t;
         }
       }
-      const tCeil = (RADIUS + 8 - y) / vy;
+      const tCeil = (grid.radius + 8 - y) / vy;
       let t = Math.min(tWall, tHit, tCeil);
       const cappedByLen = t > remaining;
       if (cappedByLen) t = remaining;
