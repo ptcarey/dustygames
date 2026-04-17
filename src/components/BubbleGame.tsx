@@ -559,13 +559,13 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
   void colorChip;
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden">
-      {/* Header bar — outside the bubble play area */}
-      <header className="flex h-10 shrink-0 items-center justify-center border-b border-white/40 bg-white/70 px-3 shadow-sm backdrop-blur">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
+      {/* App chrome: level title bar — fully outside the bubble play area */}
+      <header className="z-30 flex h-11 shrink-0 items-center justify-center border-b-2 border-border bg-card px-3 shadow-md">
         <h1 className="text-base font-bold tracking-wide text-foreground">Level {level.id}</h1>
       </header>
 
-      {/* Playfield */}
+      {/* Playfield — bubbles start here, beneath the header */}
       <div ref={containerRef} className="relative flex-1 w-full">
         <canvas
           ref={canvasRef}
