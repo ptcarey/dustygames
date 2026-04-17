@@ -108,47 +108,138 @@ function generateProcedural(): LevelConfig[] {
 
   const colorChar = (c: BubbleColor) => c[0];
 
+  /**
+   * Lace / spider-web style generators. Each returns a 2D boolean grid
+   * marking which cells should hold a bubble. Colors are layered on after.
+   */
+  const cols = 15;
+
+  const makeWeb = (rows: number, density: number): boolean[][] => {
+    const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const cx = (cols - 1) / 2;
+    const cy = rows / 2;
+    // Concentric "rings" (ovals) — the radial threads of a web.
+    const ringCount = 3 + Math.floor(density * 3);
+    for (let k = 1; k <= ringCount; k++) {
+      const rx = (cols / 2) * (k / (ringCount + 0.5));
+      const ry = (rows / 2) * (k / (ringCount + 0.5));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const dx = (c - cx) / rx;
+          const dy = (r - cy) / ry;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (Math.abs(d - 1) < 0.09) g[r][c] = true;
+        }
+      }
+    }
+    // Spokes — diagonal threads from the center outward.
+    const spokes = 6;
+    for (let s = 0; s < spokes; s++) {
+      const ang = (Math.PI * 2 * s) / spokes + 0.2;
+      for (let t = 0; t < Math.max(rows, cols); t++) {
+        const r = Math.round(cy + Math.sin(ang) * t * 0.6);
+        const c = Math.round(cx + Math.cos(ang) * t * 0.9);
+        if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
+      }
+    }
+    return g;
+  };
+
+  const makeLace = (rows: number, density: number): boolean[][] => {
+    const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+    // Repeating diamond/floral lace motif: a small stamp tiled across the grid.
+    const stamp = [
+      "..x..",
+      ".x.x.",
+      "x.x.x",
+      ".x.x.",
+      "..x..",
+    ];
+    const sw = stamp[0].length;
+    const sh = stamp.length;
+    for (let r0 = 0; r0 < rows; r0 += sh - 1) {
+      for (let c0 = -2; c0 < cols; c0 += sw - 1) {
+        for (let r = 0; r < sh; r++) {
+          for (let c = 0; c < sw; c++) {
+            if (stamp[r][c] === "x") {
+              const rr = r0 + r;
+              const cc = c0 + c;
+              if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) g[rr][cc] = true;
+            }
+          }
+        }
+      }
+    }
+    // Add a few small "lumps" — 2x2 ish clusters scattered around.
+    const lumps = 2 + Math.floor(density * 4);
+    for (let i = 0; i < lumps; i++) {
+      const r = Math.floor(rand() * (rows - 2));
+      const c = Math.floor(rand() * (cols - 2));
+      g[r][c] = true; g[r][c + 1] = true;
+      g[r + 1][c] = true; g[r + 1][c + 1] = true;
+    }
+    return g;
+  };
+
+  const makeZigzag = (rows: number, density: number): boolean[][] => {
+    const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+    // Horizontal lace bands separated by gaps; every few rows a denser garland.
+    for (let r = 0; r < rows; r++) {
+      const band = r % 4;
+      for (let c = 0; c < cols; c++) {
+        if (band === 0 && (c + r) % 2 === 0) g[r][c] = true;
+        else if (band === 2 && c % 3 === (r % 3)) g[r][c] = true;
+      }
+    }
+    // Sprinkle small lumps for variety.
+    const lumps = 3 + Math.floor(density * 4);
+    for (let i = 0; i < lumps; i++) {
+      const r = Math.floor(rand() * (rows - 1));
+      const c = Math.floor(rand() * (cols - 1));
+      g[r][c] = true; g[r][c + 1] = true; g[r + 1][c] = true;
+    }
+    return g;
+  };
+
   for (let i = 0; i < 15; i++) {
     const lvlId = 6 + i;
     const difficulty = i / 14; // 0 → 1
-    const cols = 15;
-    const rows = 20 + Math.floor(difficulty * 10); // 20 → 30
-    const colorCount = Math.min(6, 4 + Math.floor(difficulty * 3));
+    const rows = 18 + Math.floor(difficulty * 10); // 18 → 28
+    const colorCount = Math.min(5, 3 + Math.floor(difficulty * 3));
     const palette = BUBBLE_COLORS.slice(0, colorCount);
-    const shots = Math.max(20, Math.round(rows * 1.4 - difficulty * 8));
-    const possumCount = 4 + Math.floor(difficulty * 10);
+    const shots = Math.max(20, Math.round(rows * 1.4 - difficulty * 6));
+    const possumCount = 3 + Math.floor(difficulty * 8);
 
-    // Generate grid: small pockets of color (3-5 wide chunks) instead of huge blobs
-    const grid: string[] = [];
+    // Pick a pattern style — cycle through web / lace / zigzag.
+    const style = i % 3;
+    const mask =
+      style === 0 ? makeWeb(rows, difficulty) :
+      style === 1 ? makeLace(rows, difficulty) :
+      makeZigzag(rows, difficulty);
+
+    // Color the mask: walk in "patches" so neighbours often share a color,
+    // giving small lumps within the lacework.
+    const colorGrid: string[][] = mask.map(row => row.map(() => "."));
     for (let r = 0; r < rows; r++) {
-      let row = "";
       let curColor = pick(palette);
       let runLeft = 2 + Math.floor(rand() * 3);
       for (let c = 0; c < cols; c++) {
+        if (!mask[r][c]) continue;
         if (runLeft <= 0) {
-          // pick a different color for the next pocket
-          let next = pick(palette);
-          if (next === curColor && palette.length > 1) next = pick(palette);
-          curColor = next;
+          curColor = pick(palette);
           runLeft = 2 + Math.floor(rand() * 3);
         }
-        // Sprinkle more gaps so balls can sometimes slip through to deeper rows
-        if (rand() < 0.14 + difficulty * 0.12) {
-          row += ".";
-        } else {
-          row += colorChar(curColor);
-        }
+        colorGrid[r][c] = colorChar(curColor);
         runLeft--;
       }
-      grid.push(row);
     }
+    const grid: string[] = colorGrid.map(row => row.join(""));
 
-    // Sprinkle possums into random non-empty cells, biased toward the bottom
+    // Sprinkle possums into deeper non-empty cells.
     const cells: Array<[number, number]> = [];
     grid.forEach((row, r) =>
       row.split("").forEach((ch, c) => { if (ch !== ".") cells.push([r, c]); })
     );
-    // Sort so deeper rows are preferred for possums
     cells.sort((a, b) => b[0] - a[0]);
     const deepPool = cells.slice(0, Math.floor(cells.length * 0.6));
     for (let p = 0; p < possumCount && deepPool.length; p++) {
