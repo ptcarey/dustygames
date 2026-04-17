@@ -558,9 +558,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
   void colorChip;
 
   return (
-    <div className="relative h-full w-full overflow-hidden flex">
+    <div className="relative h-full w-full overflow-hidden">
       {/* Playfield */}
-      <div ref={containerRef} className="relative flex-1 h-full">
+      <div ref={containerRef} className="relative h-full w-full">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 touch-none"
@@ -570,44 +570,69 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
           onPointerCancel={onPointerUp}
         />
 
-        <div className="pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2" style={{ marginBottom: -10 }}>
-          <Dusty size={160} mood={dustyMood} ballColor={ballColor} />
+        {/* HUD — inside the playfield, top-right, stacked top→bottom */}
+        <div className="pointer-events-auto absolute right-1.5 top-1.5 z-10 flex w-16 flex-col items-stretch gap-1.5">
+          <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Score</div>
+            <div className="text-base font-bold leading-tight text-foreground">{score}</div>
+          </div>
+          <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Shots</div>
+            <div className="text-base font-bold leading-tight text-primary">{shotsLeft}</div>
+          </div>
+          <div className="flex w-full items-center justify-center gap-1 rounded-xl bg-white/85 px-2 py-1 shadow-md backdrop-blur">
+            <svg width="16" height="16" viewBox="-22 -22 44 44">
+              <PossumFace />
+            </svg>
+            <span className="text-sm font-bold leading-none">{possumsLeft}</span>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={onExit}
+            aria-label="Back to menu"
+            className="h-7 w-full rounded-xl px-2 text-xs"
+          >
+            Menu
+          </Button>
+        </div>
+
+        <div
+          className={`pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2 ${overlay === "win" ? "animate-bounce-soft" : ""}`}
+          style={{ marginBottom: -6 }}
+        >
+          <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
         </div>
 
         {/* Current + next ball indicators next to Dusty (in front) */}
-        <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 90 }}>
-          <BubbleSvg color={ballColor} size={42} />
-          <BubbleSvg color={nextBallColor} size={30} className="opacity-80" />
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
+          <BubbleSvg color={ballColor} size={32} />
+          <BubbleSvg color={nextBallColor} size={22} className="opacity-80" />
         </div>
-      </div>
 
-      {/* Side panel — outside the playfield, stacked from bottom up */}
-      <div className="flex w-24 flex-col-reverse items-stretch gap-2 p-2 sm:w-28">
-        <Button variant="secondary" onClick={onExit} aria-label="Back to menu" className="w-full">
-          Menu
-        </Button>
-        <div className="flex w-full items-center justify-center gap-1 rounded-2xl bg-white/85 px-3 py-2 shadow-md backdrop-blur">
-          <svg width="22" height="22" viewBox="-22 -22 44 44">
-            <PossumFace />
-          </svg>
-          <span className="text-lg font-bold">{possumsLeft}</span>
-        </div>
-        <div className="w-full rounded-2xl bg-white/85 px-3 py-2 text-center shadow-md backdrop-blur">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Shots</div>
-          <div className="text-2xl font-bold text-primary">{shotsLeft}</div>
-        </div>
-        <div className="w-full rounded-2xl bg-white/85 px-3 py-2 text-center shadow-md backdrop-blur">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Score</div>
-          <div className="text-2xl font-bold text-foreground">{score}</div>
-        </div>
+        {/* Celebration: dancing possums next to Dusty when level is won */}
+        {overlay === "win" && (
+          <div className="pointer-events-none absolute bottom-2 left-0 right-0 z-10 flex items-end justify-center gap-3">
+            {[0, 1, 2, 3].map(i => (
+              <div
+                key={i}
+                className="animate-bounce-soft"
+                style={{ animationDelay: `${i * 0.12}s` }}
+              >
+                <svg width="42" height="42" viewBox="-22 -22 44 44">
+                  <PossumFace />
+                </svg>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {overlay === "win" && (
         <Overlay
           title="🎉 You saved them all!"
           subtitle={`Score: ${score}`}
-          ctaLabel="Next →"
-          onCta={() => onWinRef.current(score)}
+          ctaLabel="Next Level →"
+          onCta={onNext}
         />
       )}
       {overlay === "lose" && (
