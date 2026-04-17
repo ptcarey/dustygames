@@ -136,12 +136,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
     const grid = s.grid;
     if (!grid) return;
 
-    // Compute target scroll: anchor bottom of remaining stack to ~visible row 14
-    const VISIBLE_ROWS = 15;
-    let maxRow = 0;
-    for (const b of grid.bubbles) if (b.row > maxRow) maxRow = b.row;
-    s.targetScrollY = (VISIBLE_ROWS - 1 - maxRow) * grid.rowHeight;
-    if (s.targetScrollY > 0) s.targetScrollY = 0; // never push above natural top
+    // Anchor the TOPMOST remaining bubble to just under the header so the stack
+    // always starts at the top of the playfield (no floating gap above row 0).
+    let minRow = Infinity;
+    for (const b of grid.bubbles) if (b.row < minRow) minRow = b.row;
+    if (!isFinite(minRow)) minRow = 0;
+    s.targetScrollY = -minRow * grid.rowHeight;
     // Smoothly approach target
     const diff = s.targetScrollY - s.scrollY;
     s.scrollY += diff * Math.min(1, dt * 3);
