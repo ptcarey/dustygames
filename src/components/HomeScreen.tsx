@@ -1,5 +1,5 @@
-import { Dusty } from "./Dusty";
 import { Sfx, unlockAudio } from "@/game/sound";
+import dustyAndMatilda from "@/assets/dusty-and-matilda.png";
 
 interface Props {
   onPlay: () => void;
@@ -21,7 +21,12 @@ export function HomeScreen({ onPlay, onLevels, audioEnabled, onToggleAudio, high
       </div>
 
       <div className="animate-float">
-        <Dusty size={220} mood="wag" />
+        <img
+          src={dustyAndMatilda}
+          alt="Dusty the cavoodle hugging Matilda"
+          className="h-auto w-[260px] select-none drop-shadow-lg sm:w-[300px]"
+          draggable={false}
+        />
       </div>
 
       <div className="flex w-full max-w-xs flex-col items-stretch gap-4">
