@@ -37,7 +37,7 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props
       <svg
         viewBox="0 0 100 40"
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-        style={{ top: `${h * 0.62}px`, width: `${w * 0.42}px`, height: "auto" }}
+        style={{ top: `${h * 0.42}px`, width: `${w * 0.55}px`, height: "auto" }}
       >
         <path
           d="M10 6 L42 20 L10 34 Z"
