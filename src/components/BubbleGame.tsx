@@ -653,12 +653,21 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
       </div>
 
       {overlay === "win" && (
-        <Overlay
-          title="🎉 You saved them all!"
-          subtitle={`Score: ${score}`}
-          ctaLabel="Next Level →"
-          onCta={onNext}
-        />
+        level.id === 60 ? (
+          <Overlay
+            title="💖 Dusty found Matilda!"
+            subtitle={`Reunited at last! Final score: ${score}`}
+            ctaLabel="Back to Map"
+            onCta={onExit}
+          />
+        ) : (
+          <Overlay
+            title="🎉 You saved them all!"
+            subtitle={`Score: ${score}`}
+            ctaLabel="Next Level →"
+            onCta={onNext}
+          />
+        )
       )}
       {overlay === "lose" && (
         <Overlay

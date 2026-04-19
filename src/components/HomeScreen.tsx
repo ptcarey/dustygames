@@ -17,7 +17,7 @@ export function HomeScreen({ onPlay, onLevels, audioEnabled, onToggleAudio, high
         <h1 className="text-5xl font-bold text-foreground drop-shadow-sm sm:text-6xl">
           Dusty's Bubble Pop
         </h1>
-        <p className="mt-2 text-lg text-muted-foreground">Help Dusty rescue the possums!</p>
+        <p className="mt-2 text-lg text-muted-foreground">Help Dusty rescue the possums and find his owner, Matilda</p>
       </div>
 
       <div className="animate-float">
