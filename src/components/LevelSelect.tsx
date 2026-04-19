@@ -160,7 +160,7 @@ function StagePath({ stage, levels, unlocked, focusLevel, onSelect, activeRef }:
             onClick={() => { Sfx.click(); onSelect(lvl.id); }}
             className={`absolute flex flex-col items-center transition-transform active:scale-95 ${
               locked ? "opacity-60" : ""
-            }`}
+            } ${isCurrent && !locked ? "animate-bounce-soft" : ""}`}
             style={{
               left: `${x}%`,
               top: y,
