@@ -27,7 +27,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
-export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit }: Props) {
+export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
