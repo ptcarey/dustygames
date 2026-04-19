@@ -194,6 +194,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
         Sfx.squeak();
         flashHappy();
         setPossumsLeft(p => Math.max(0, p - 1));
+        // A possum landing may complete the level even if no further shot is fired.
+        // Re-run end-check on the next tick so falling rescues count toward winning.
+        setTimeout(() => checkEnd(shotsLeftRef.current), 50);
       }
     }
     s.falling = s.falling.filter(f => {
