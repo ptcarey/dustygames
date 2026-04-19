@@ -238,6 +238,8 @@ function buildProcLevel(
     grid[r] = arr.join("");
   }
 
+  ensurePossumInLastRow(grid);
+
   // Recompute used colors for accurate shooter palette.
   const finalUsed = new Set<BubbleColor>();
   for (const row of grid)
@@ -343,6 +345,31 @@ function pruneFloaters(grid: string[], cols: number) {
   }
 }
 
+/**
+ * Guarantee at least one trapped possum in the deepest row that contains
+ * bubbles — every level should reward the player with a rescue at the bottom.
+ * If the row already has an uppercase (possum) char this is a no-op.
+ */
+function ensurePossumInLastRow(grid: string[]) {
+  for (let r = grid.length - 1; r >= 0; r--) {
+    const row = grid[r];
+    if (row.replace(/[. ]/g, "").length === 0) continue;
+    if (/[A-Z]/.test(row)) return;
+    const arr = row.split("");
+    // Prefer a centre-ish bubble so it feels like a deliberate placement.
+    const indices: number[] = [];
+    arr.forEach((ch, i) => { if (ch !== "." && ch !== " ") indices.push(i); });
+    const target = indices[Math.floor(indices.length / 2)];
+    arr[target] = arr[target].toUpperCase();
+    grid[r] = arr.join("");
+    return;
+  }
+}
+
+// Apply the guarantee to handcrafted Stage 1 too.
+for (const lvl of HANDCRAFTED_STAGE1) ensurePossumInLastRow(lvl.grid);
+
 export const LEVELS: LevelConfig[] = [...HANDCRAFTED_STAGE1, ...generateAll()];
 
 export const TOTAL_LEVELS = LEVELS.length;
+
