@@ -72,6 +72,7 @@ export function LevelSelect({ unlocked, lastPlayed, onSelect, onBack }: Props) {
                 stage={stage}
                 levels={stageLevels}
                 unlocked={unlocked}
+                focusLevel={focusLevel}
                 onSelect={onSelect}
                 activeRef={activeRef}
               />
@@ -88,6 +89,7 @@ interface StagePathProps {
   stage: typeof STAGES[number];
   levels: typeof LEVELS;
   unlocked: number;
+  focusLevel: number;
   onSelect: (id: number) => void;
   activeRef: React.RefObject<HTMLButtonElement>;
 }
@@ -97,7 +99,7 @@ interface StagePathProps {
  * Stamps zig-zag left-right to feel hand-drawn. The connecting line is an
  * SVG curve drawn behind the stamps.
  */
-function StagePath({ stage, levels, unlocked, onSelect, activeRef }: StagePathProps) {
+function StagePath({ stage, levels, unlocked, focusLevel, onSelect, activeRef }: StagePathProps) {
   const STAMP = 64;            // px size of each level stamp
   const ROW_HEIGHT = 86;       // vertical spacing between stamps
   const WIDTH_PCT = 70;        // horizontal swing width (% of container)
@@ -148,7 +150,7 @@ function StagePath({ stage, levels, unlocked, onSelect, activeRef }: StagePathPr
         const x = xs[i];
         const y = i * ROW_HEIGHT + 6;
         const locked = lvl.id > unlocked;
-        const isCurrent = lvl.id === unlocked;
+        const isCurrent = lvl.id === focusLevel;
         const finale = isFinale(lvl.id);
         return (
           <button
