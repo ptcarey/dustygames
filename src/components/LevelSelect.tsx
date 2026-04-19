@@ -6,6 +6,7 @@ import { StageDecor } from "./StageDecor";
 
 interface Props {
   unlocked: number;
+  lastPlayed?: number;
   onSelect: (levelId: number) => void;
   onBack: () => void;
 }
@@ -16,16 +17,18 @@ interface Props {
  * Layout: a vertically scrolling map made of 6 themed stage panels stacked
  * top-to-bottom. Inside each panel an SVG winding path connects the 10 level
  * "stamps". Roughly ~15 levels are visible at once on a typical phone; the
- * user scrolls to reach the rest. Auto-scrolls to the current unlocked level
- * on mount so progress is always in view.
+ * user scrolls so the most recently played level sits near the top.
  */
-export function LevelSelect({ unlocked, onSelect, onBack }: Props) {
+export function LevelSelect({ unlocked, lastPlayed, onSelect, onBack }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
 
+  // Highlight the level the player most recently entered (or the highest unlocked as fallback).
+  const focusLevel = lastPlayed && lastPlayed >= 1 ? lastPlayed : unlocked;
+
   useEffect(() => {
-    // Center the highest unlocked level on screen.
-    activeRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    // Scroll so the focused level is near the top of the visible map.
+    activeRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
   }, []);
 
   return (

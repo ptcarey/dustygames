@@ -3,7 +3,7 @@ import { HomeScreen } from "@/components/HomeScreen";
 import { LevelSelect } from "@/components/LevelSelect";
 import { BubbleGame } from "@/components/BubbleGame";
 import { LEVELS, TOTAL_LEVELS } from "@/game/levels";
-import { loadSave, setAudioEnabled, setHighScore, unlockLevel } from "@/game/storage";
+import { loadSave, setAudioEnabled, setHighScore, setLastPlayedLevel, unlockLevel } from "@/game/storage";
 import { setSoundEnabled } from "@/game/sound";
 
 type Screen = "home" | "levels" | "game";
@@ -20,6 +20,8 @@ const Index = () => {
 
   const startLevel = (id: number) => {
     setCurrentLevelId(id);
+    setLastPlayedLevel(id);
+    setSave(loadSave());
     setScreen("game");
   };
 
@@ -55,7 +57,7 @@ const Index = () => {
     <main className="mx-auto flex h-[100dvh] max-w-[560px] flex-col">
       {screen === "home" && (
         <HomeScreen
-          onPlay={() => startLevel(save.unlockedLevel)}
+          onPlay={() => startLevel(save.lastPlayedLevel || save.unlockedLevel)}
           onLevels={() => setScreen("levels")}
           audioEnabled={save.audioEnabled}
           onToggleAudio={toggleAudio}
@@ -65,6 +67,7 @@ const Index = () => {
       {screen === "levels" && (
         <LevelSelect
           unlocked={save.unlockedLevel}
+          lastPlayed={save.lastPlayedLevel}
           onSelect={startLevel}
           onBack={() => setScreen("home")}
         />
@@ -78,6 +81,7 @@ const Index = () => {
           onLose={handleLose}
           onNext={handleNext}
           onExit={() => setScreen("levels")}
+          onMenu={() => setScreen("home")}
         />
       )}
     </main>
