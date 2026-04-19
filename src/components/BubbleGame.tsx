@@ -347,6 +347,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
   useEffect(() => { scoreRef.current = score; }, [score]);
   const overlayRef = useRef<typeof overlay>(null);
   useEffect(() => { overlayRef.current = overlay; }, [overlay]);
+  const shotsLeftRef = useRef(level.shots);
+  useEffect(() => { shotsLeftRef.current = shotsLeft; }, [shotsLeft]);
 
   const draw = () => {
     const canvas = canvasRef.current;
