@@ -6,6 +6,7 @@ import { StageDecor } from "./StageDecor";
 
 interface Props {
   unlocked: number;
+  lastPlayed?: number;
   onSelect: (levelId: number) => void;
   onBack: () => void;
 }
@@ -16,16 +17,18 @@ interface Props {
  * Layout: a vertically scrolling map made of 6 themed stage panels stacked
  * top-to-bottom. Inside each panel an SVG winding path connects the 10 level
  * "stamps". Roughly ~15 levels are visible at once on a typical phone; the
- * user scrolls to reach the rest. Auto-scrolls to the current unlocked level
- * on mount so progress is always in view.
+ * user scrolls so the most recently played level sits near the top.
  */
-export function LevelSelect({ unlocked, onSelect, onBack }: Props) {
+export function LevelSelect({ unlocked, lastPlayed, onSelect, onBack }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
 
+  // Highlight the level the player most recently entered (or the highest unlocked as fallback).
+  const focusLevel = lastPlayed && lastPlayed >= 1 ? lastPlayed : unlocked;
+
   useEffect(() => {
-    // Center the highest unlocked level on screen.
-    activeRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    // Scroll so the focused level is near the top of the visible map.
+    activeRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
   }, []);
 
   return (
@@ -69,6 +72,7 @@ export function LevelSelect({ unlocked, onSelect, onBack }: Props) {
                 stage={stage}
                 levels={stageLevels}
                 unlocked={unlocked}
+                focusLevel={focusLevel}
                 onSelect={onSelect}
                 activeRef={activeRef}
               />
@@ -85,6 +89,7 @@ interface StagePathProps {
   stage: typeof STAGES[number];
   levels: typeof LEVELS;
   unlocked: number;
+  focusLevel: number;
   onSelect: (id: number) => void;
   activeRef: React.RefObject<HTMLButtonElement>;
 }
@@ -94,7 +99,7 @@ interface StagePathProps {
  * Stamps zig-zag left-right to feel hand-drawn. The connecting line is an
  * SVG curve drawn behind the stamps.
  */
-function StagePath({ stage, levels, unlocked, onSelect, activeRef }: StagePathProps) {
+function StagePath({ stage, levels, unlocked, focusLevel, onSelect, activeRef }: StagePathProps) {
   const STAMP = 64;            // px size of each level stamp
   const ROW_HEIGHT = 86;       // vertical spacing between stamps
   const WIDTH_PCT = 70;        // horizontal swing width (% of container)
@@ -145,7 +150,7 @@ function StagePath({ stage, levels, unlocked, onSelect, activeRef }: StagePathPr
         const x = xs[i];
         const y = i * ROW_HEIGHT + 6;
         const locked = lvl.id > unlocked;
-        const isCurrent = lvl.id === unlocked;
+        const isCurrent = lvl.id === focusLevel;
         const finale = isFinale(lvl.id);
         return (
           <button
@@ -155,7 +160,7 @@ function StagePath({ stage, levels, unlocked, onSelect, activeRef }: StagePathPr
             onClick={() => { Sfx.click(); onSelect(lvl.id); }}
             className={`absolute flex flex-col items-center transition-transform active:scale-95 ${
               locked ? "opacity-60" : ""
-            }`}
+            } ${isCurrent && !locked ? "animate-bounce-soft" : ""}`}
             style={{
               left: `${x}%`,
               top: y,

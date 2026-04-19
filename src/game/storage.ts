@@ -14,6 +14,7 @@ const DEFAULT: GameSave = {
   unlockedLevel: TOTAL_LEVELS,
   highScore: 0,
   audioEnabled: true,
+  lastPlayedLevel: 1,
 };
 
 export function loadSave(): GameSave {
@@ -55,5 +56,11 @@ export function setHighScore(score: number) {
 export function setAudioEnabled(enabled: boolean) {
   const s = loadSave();
   s.audioEnabled = enabled;
+  writeSave(s);
+}
+
+export function setLastPlayedLevel(levelId: number) {
+  const s = loadSave();
+  s.lastPlayedLevel = levelId;
   writeSave(s);
 }

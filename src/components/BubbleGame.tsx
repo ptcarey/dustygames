@@ -19,6 +19,7 @@ interface Props {
   onLose: () => void;
   onNext: () => void;
   onExit: () => void;
+  onMenu: () => void;
 }
 
 interface SavedPossum { id: number; x: number; y: number; born: number; }
@@ -26,7 +27,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
-export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit }: Props) {
+export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -645,8 +646,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
           </div>
           <Button
             variant="secondary"
-            onClick={onExit}
-            aria-label="Back to menu"
+            onClick={onMenu}
+            aria-label="Back to home"
             className="h-7 w-full rounded-xl px-2 text-xs"
           >
             Menu
@@ -700,7 +701,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
           subtitle="Try again?"
           ctaLabel="Retry"
           onCta={() => initLevel()}
-          onSecondary={onExit}
+          onSecondary={onMenu}
         />
       )}
     </div>

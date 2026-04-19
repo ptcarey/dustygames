@@ -46,4 +46,5 @@ export interface GameSave {
   unlockedLevel: number; // highest level reachable (1-indexed)
   highScore: number;
   audioEnabled: boolean;
+  lastPlayedLevel: number; // most recently entered level (for map auto-scroll)
 }
