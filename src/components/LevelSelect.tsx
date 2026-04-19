@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { LEVELS } from "@/game/levels";
 import { STAGES, FINAL_LEVEL_ID } from "@/game/stages";
 import { Sfx } from "@/game/sound";
+import { StageDecor } from "./StageDecor";
 
 interface Props {
   unlocked: number;
@@ -49,7 +50,9 @@ export function LevelSelect({ unlocked, onSelect, onBack }: Props) {
               className="relative px-3 pb-2 pt-3"
               style={{ background: stage.gradient }}
             >
-              <header className="mb-2 flex items-center justify-between rounded-2xl bg-card/70 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+              <StageDecor stageId={stage.id} />
+
+              <header className="relative mb-2 flex items-center justify-between rounded-2xl bg-card/70 px-3 py-1.5 shadow-sm backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{stage.emoji}</span>
                   <h3 className="text-base font-bold text-foreground">
@@ -61,6 +64,7 @@ export function LevelSelect({ unlocked, onSelect, onBack }: Props) {
                 </span>
               </header>
 
+              <div className="relative">
               <StagePath
                 stage={stage}
                 levels={stageLevels}
@@ -68,6 +72,7 @@ export function LevelSelect({ unlocked, onSelect, onBack }: Props) {
                 onSelect={onSelect}
                 activeRef={activeRef}
               />
+              </div>
             </section>
           );
         })}
