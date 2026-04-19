@@ -596,10 +596,30 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit 
           <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
         </div>
 
-        {/* Current + next ball indicators next to Dusty (in front) */}
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
+        {/* Current + next ball indicators next to Dusty. Tap the next ball to swap. */}
+        <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
           <BubbleSvg color={ballColor} size={32} />
-          <BubbleSvg color={nextBallColor} size={22} className="opacity-80" />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (overlay) return;
+              const s = stateRef.current;
+              if (s.projectile) return; // can't swap mid-shot
+              [s.currentColor, s.nextColor] = [s.nextColor, s.currentColor];
+              setBallColor(s.currentColor);
+              setNextBallColor(s.nextColor);
+              Sfx.click();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Swap to next ball"
+            className="rounded-full p-0.5 transition-transform active:scale-90 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <BubbleSvg color={nextBallColor} size={26} className="opacity-90" />
+          </button>
+          <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[9px] font-bold text-foreground/70 shadow-sm">
+            ⇄ tap
+          </span>
         </div>
 
         {/* HUD — bottom-right, inside the right wall, next to Dusty */}
