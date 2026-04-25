@@ -95,13 +95,18 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   // Will is shown on screen but dimmed/inactive.
   const willOnThisLevel = WILL_LEVELS.has(level.id);
   const [popOrDropCount, setPopOrDropCount] = useState(0);
+  // Will may only fire once per level on his eligible levels (5–10). After
+  // his shot lands, the active thrower flips back to Dusty and Will becomes
+  // un-selectable for the rest of the level.
+  const [willUsedThisLevel, setWillUsedThisLevel] = useState(false);
   const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
     // Reset to Dusty whenever the player enters a level — Will must be
     // re-unlocked each level.
     setActiveCharacterId("dusty");
     return "dusty";
   });
-  const willAvailable = willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD;
+  const willAvailable =
+    willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD && !willUsedThisLevel;
   const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
   const activeCharacter = getCharacterById(activeThrowerId);
   const projectileBehavior = useMemo(
@@ -110,14 +115,18 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   );
 
   const swapThrower = useCallback(() => {
-    if (!willAvailable) return;
+    // Allow swapping in either direction while Will is available. Swapping
+    // away from Will (back to Dusty) is always allowed, even after Will is
+    // used, so the player isn't trapped on the Will sprite.
+    if (!willOnThisLevel) return;
     const s = stateRef.current;
     if (s.projectile) return; // can't swap mid-shot
     const nextId = activeThrowerId === "dusty" ? "will" : "dusty";
+    if (nextId === "will" && !willAvailable) return;
     setActiveCharacterId(nextId);
     setActiveThrowerIdState(nextId);
     Sfx.click();
-  }, [activeThrowerId, willAvailable]);
+  }, [activeThrowerId, willAvailable, willOnThisLevel]);
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
