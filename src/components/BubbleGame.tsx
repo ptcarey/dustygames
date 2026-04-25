@@ -11,10 +11,9 @@ import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
-import { CHARACTERS, getCharacterById } from "@/characters/characters";
-import { getActiveCharacterId, setActiveCharacterId } from "@/game/storage";
+import { getCharacterById } from "@/characters/characters";
+import { setActiveCharacterId } from "@/game/storage";
 import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
-import { neighborsOf } from "@/game/engine";
 
 interface Props {
   level: LevelConfig;
