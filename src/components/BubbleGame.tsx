@@ -263,10 +263,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           z.rowsTravelled += 1;
           z.dir = (z.dir === 1 ? -1 : 1);
           z.nextRowY -= grid.rowHeight;
-          // Re-aim: same upward speed, horizontal component diagonal.
+          // Re-aim around the player's aimed line, flipping wobble side.
           const speed = z.baseSpeed;
-          const ang = Math.PI * 0.32; // ~58° from vertical
-          p.vx = Math.sin(ang) * speed * z.dir;
+          const ang = z.aimFromVertical + z.wobble * z.dir;
+          p.vx = Math.sin(ang) * speed;
           p.vy = -Math.cos(ang) * speed;
         }
         // Will's bubble always travels all the way to the ceiling. The
