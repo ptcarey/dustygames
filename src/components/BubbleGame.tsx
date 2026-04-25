@@ -783,8 +783,47 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           className={`pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2 ${overlay === "win" ? "animate-bounce-soft" : ""}`}
           style={{ marginBottom: -6 }}
         >
-          <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
+          <Dusty
+            size={112}
+            mood={overlay === "win" ? "happy" : dustyMood}
+            ballColor={ballColor}
+            characterId={activeThrowerId}
+          />
         </div>
+
+        {/* Waiting character — shown on Will-eligible levels. Dimmed and
+            non-interactive until Will is unlocked, then becomes a tap target
+            that swaps the active thrower. */}
+        {willOnThisLevel && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); swapThrower(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            disabled={!willAvailable || !!overlay || !!stateRef.current.projectile}
+            aria-label={
+              willAvailable
+                ? `Swap to ${getCharacterById(waitingCharacterId).name}`
+                : `${getCharacterById(waitingCharacterId).name} — pop ${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} more to unlock`
+            }
+            className={`absolute bottom-2 left-2 z-10 flex flex-col items-center rounded-2xl bg-white/70 p-1 shadow-md backdrop-blur transition-transform ${
+              willAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
+            }`}
+          >
+            <div className={willAvailable ? "" : "opacity-40 grayscale"}>
+              <Dusty
+                size={64}
+                mood="idle"
+                characterId={waitingCharacterId}
+                showBow={false}
+              />
+            </div>
+            <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
+              {willAvailable
+                ? `Tap ${getCharacterById(waitingCharacterId).name}`
+                : `${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} to go`}
+            </span>
+          </button>
+        )}
 
         {/* Current + next ball indicators next to Dusty. Tap the next ball to swap. */}
         <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
