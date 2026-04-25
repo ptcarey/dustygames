@@ -11,9 +11,11 @@ import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
-import { getCharacterById } from "@/characters/characters";
+import { getCharacterById, getCompanionForLevel } from "@/characters/characters";
 import { setActiveCharacterId } from "@/game/storage";
 import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
+import { FarewellScreen } from "./FarewellScreen";
+import type { Character } from "@/game/types";
 
 interface Props {
   level: LevelConfig;
@@ -23,6 +25,7 @@ interface Props {
   onNext: () => void;
   onExit: () => void;
   onMenu: () => void;
+  onFarewell?: (character: Character) => void;
 }
 
 interface SavedPossum { id: number; x: number; y: number; born: number; }
@@ -30,14 +33,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
-/** Levels on which Will joins the game as a selectable second thrower. */
-const WILL_LEVELS: ReadonlySet<number> = new Set([5, 6, 7, 8, 9, 10]);
-/** Pops or drops Dusty must produce before Will becomes selectable. */
-const WILL_UNLOCK_THRESHOLD = 3;
-/** Pops Dusty must produce after a Will use before Will reactivates. */
-const WILL_REACTIVATE_THRESHOLD = 10;
-
-export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
+export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu, onFarewell }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -53,7 +49,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       x: number; y: number; vx: number; vy: number; color: BubbleColor;
       // Optional zig-zag flight (Will's Zigzag Zapper ability).
       zigzag?: {
-        behavior: ProjectileBehavior;
+        behavior: Extract<ProjectileBehavior, { kind: "zigzag-explode" }>;
         startY: number;
         rowsTravelled: number;
         nextRowY: number;        // y at which to flip horizontal direction
@@ -94,28 +90,33 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   const [ballColor, setBallColor] = useState<BubbleColor>("red");
   const [nextBallColor, setNextBallColor] = useState<BubbleColor>("blue");
 
-  // Will joins the game on levels 5–10. Dusty must pop or drop
-  // WILL_UNLOCK_THRESHOLD bubbles before Will becomes selectable; until then
-  // Will is shown on screen but dimmed/inactive.
-  const willOnThisLevel = WILL_LEVELS.has(level.id);
+  // The active companion (if any) is fully data-driven — derived from the
+  // character config's `availability.levels` range. A null companion means
+  // Dusty plays this level alone.
+  const companion = useMemo(() => getCompanionForLevel(level.id), [level.id]);
+  const companionOnThisLevel = companion !== null;
+  const companionUnlockThreshold = companion?.availability?.initialUnlock.count ?? 0;
+  const companionReactivateThreshold = companion?.availability?.reactivation.count ?? 0;
   const [popOrDropCount, setPopOrDropCount] = useState(0);
-  // Cooldown baseline: when Will fires, we record the current pop count.
-  // Will reactivates once `popOrDropCount` has grown by
-  // WILL_REACTIVATE_THRESHOLD beyond that baseline. Null = Will has not yet
-  // been used this level (initial unlock uses WILL_UNLOCK_THRESHOLD).
-  const [willCooldownBaseline, setWillCooldownBaseline] = useState<number | null>(null);
+  // Cooldown baseline: when the companion fires, we record the current pop
+  // count. The companion reactivates once `popOrDropCount` has grown by
+  // `companionReactivateThreshold` beyond that baseline. Null = companion
+  // has not yet been used this level (initial unlock uses
+  // `companionUnlockThreshold`).
+  const [companionCooldownBaseline, setCompanionCooldownBaseline] = useState<number | null>(null);
   const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
-    // Reset to Dusty whenever the player enters a level — Will must be
-    // re-unlocked each level.
+    // Reset to Dusty whenever the player enters a level — the companion
+    // must be re-unlocked each level.
     setActiveCharacterId("dusty");
     return "dusty";
   });
-  const willAvailable =
-    willOnThisLevel &&
-    (willCooldownBaseline === null
-      ? popOrDropCount >= WILL_UNLOCK_THRESHOLD
-      : popOrDropCount - willCooldownBaseline >= WILL_REACTIVATE_THRESHOLD);
-  const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
+  const companionAvailable =
+    companionOnThisLevel &&
+    (companionCooldownBaseline === null
+      ? popOrDropCount >= companionUnlockThreshold
+      : popOrDropCount - companionCooldownBaseline >= companionReactivateThreshold);
+  const companionId = companion?.id ?? "dusty";
+  const waitingCharacterId = activeThrowerId === "dusty" ? companionId : "dusty";
   const activeCharacter = getCharacterById(activeThrowerId);
   const projectileBehavior = useMemo(
     () => getProjectileBehaviorForAbilities(activeCharacter.abilityIds),
@@ -123,18 +124,18 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   );
 
   const swapThrower = useCallback(() => {
-    // Allow swapping in either direction while Will is available. Swapping
-    // away from Will (back to Dusty) is always allowed, even after Will is
-    // used, so the player isn't trapped on the Will sprite.
-    if (!willOnThisLevel) return;
+    // Allow swapping in either direction while the companion is available.
+    // Swapping back to Dusty is always allowed, even after the companion
+    // is used, so the player isn't trapped on the companion sprite.
+    if (!companionOnThisLevel) return;
     const s = stateRef.current;
     if (s.projectile) return; // can't swap mid-shot
-    const nextId = activeThrowerId === "dusty" ? "will" : "dusty";
-    if (nextId === "will" && !willAvailable) return;
+    const nextId = activeThrowerId === "dusty" ? companionId : "dusty";
+    if (nextId === companionId && !companionAvailable) return;
     setActiveCharacterId(nextId);
     setActiveThrowerIdState(nextId);
     Sfx.click();
-  }, [activeThrowerId, willAvailable, willOnThisLevel]);
+  }, [activeThrowerId, companionAvailable, companionOnThisLevel, companionId]);
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
@@ -174,10 +175,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     setScore(0);
     setPossumsLeft(grid.bubbles.filter(b => b.hasPossum).length);
     setOverlay(null);
-    // Reset Will-related state — pop counter resets per level, and the
-    // active thrower returns to Dusty so Will must be re-earned.
+    // Reset companion-related state — pop counter resets per level, and
+    // the active thrower returns to Dusty so the companion must be
+    // re-earned.
     setPopOrDropCount(0);
-    setWillCooldownBaseline(null);
+    setCompanionCooldownBaseline(null);
     setActiveCharacterId("dusty");
     setActiveThrowerIdState("dusty");
   }, [level]);
