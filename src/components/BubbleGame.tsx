@@ -222,15 +222,46 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       if (p.x < grid.radius) { p.x = grid.radius; p.vx = -p.vx; }
       if (p.x > s.canvasW - grid.radius) { p.x = s.canvasW - grid.radius; p.vx = -p.vx; }
 
-      let hit = false;
-      if (p.y <= grid.radius + 8) hit = true;
-      for (const b of grid.bubbles) {
-        const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
-        if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
-      }
-      if (hit) {
-        landProjectile(p);
-        s.projectile = null;
+      if (p.zigzag) {
+        // Will's Zigzag Zapper: pop bubbles touched along the way; flip
+        // horizontal direction every row; explode after rowsBeforeExplode.
+        const z = p.zigzag;
+        // Pop any bubble we directly contact along the path.
+        for (const b of grid.bubbles) {
+          if (z.poppedIds.has(b.id)) continue;
+          const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+          if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) {
+            z.poppedIds.add(b.id);
+          }
+        }
+        // When projectile crosses the next row threshold, flip direction
+        // and increment row counter.
+        if (p.y <= z.nextRowY) {
+          z.rowsTravelled += 1;
+          z.dir = (z.dir === 1 ? -1 : 1);
+          z.nextRowY -= grid.rowHeight;
+          // Re-aim: same upward speed, horizontal component diagonal.
+          const speed = z.baseSpeed;
+          const ang = Math.PI * 0.32; // ~58° from vertical
+          p.vx = Math.sin(ang) * speed * z.dir;
+          p.vy = -Math.cos(ang) * speed;
+        }
+        const reachedTop = p.y <= grid.radius + 8;
+        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
+          detonateZigzag(p, z);
+          s.projectile = null;
+        }
+      } else {
+        let hit = false;
+        if (p.y <= grid.radius + 8) hit = true;
+        for (const b of grid.bubbles) {
+          const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+          if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
+        }
+        if (hit) {
+          landProjectile(p);
+          s.projectile = null;
+        }
       }
     }
 
