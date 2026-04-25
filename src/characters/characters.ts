@@ -16,6 +16,7 @@ export const CHARACTERS: readonly Character[] = [
     spriteRef: dustySprite,
     abilityIds: [],
     voiceLines: [],
+    cosmetics: ["bowtie"],
   },
   {
     id: "will",
@@ -27,6 +28,12 @@ export const CHARACTERS: readonly Character[] = [
     abilityIds: ["zigzag-zapper"],
     voiceLines: [],
     backstory: "A cheeky toy poodle who zig-zags his bubbles for maximum mischief.",
+    cosmetics: [],
+    availability: {
+      levels: { from: 5, to: 10 },
+      initialUnlock: { metric: "popOrDropInLevel", count: 3 },
+      reactivation: { metric: "popOrDropInLevel", count: 10 },
+    },
   },
 ] as const;
 
