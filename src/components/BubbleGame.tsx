@@ -778,17 +778,24 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     vy = (vy / mag) * SHOOT_SPEED;
     if (projectileBehavior && projectileBehavior.kind === "zigzag-explode") {
       const grid = s.grid!;
-      // Player-directed: take the first leg in the aimed horizontal
-      // direction (left if vx < 0, otherwise right). The bubble still
-      // travels predominantly upward but zig-zags around the aimed line.
+      // Player-directed: use the aimed angle as the base trajectory.
+      // The zigzag flips horizontal direction around that aim each row
+      // so the bubble snakes along the line the player chose.
       const speed = SHOOT_SPEED;
+      // Aim angle measured from vertical (0 = straight up). Negative = left.
+      const aimFromVertical = Math.atan2(vx, -vy);
+      // Zigzag wobble amplitude added/subtracted from the aim each row.
+      const wobble = Math.PI * 0.28; // ~50°
       const initialDir: 1 | -1 = vx < 0 ? -1 : 1;
-      const ang = Math.PI * 0.32;
+      // First leg: aim + wobble in initialDir
+      const firstAng = aimFromVertical + wobble * initialDir;
+      const firstVx = Math.sin(firstAng) * speed;
+      const firstVy = -Math.cos(firstAng) * speed;
       s.projectile = {
         x: s.shooterX,
         y: s.shooterY,
-        vx: Math.sin(ang) * speed * initialDir,
-        vy: -Math.cos(ang) * speed,
+        vx: firstVx,
+        vy: firstVy,
         color: s.currentColor,
         zigzag: {
           behavior: projectileBehavior,
@@ -798,6 +805,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           dir: initialDir,
           poppedIds: new Set<number>(),
           baseSpeed: speed,
+          aimFromVertical,
+          wobble,
         },
       };
       // Will fires once per level on his eligible levels — mark him used
