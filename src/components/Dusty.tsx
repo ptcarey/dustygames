@@ -9,18 +9,24 @@ interface Props {
   /** Color of the bubble Dusty is about to throw — shown as his bowtie. */
   ballColor?: BubbleColor;
   className?: string;
+  /** Override which character to render. Defaults to the active character. */
+  characterId?: string;
+  /** When false, the bowtie overlay is hidden (e.g. waiting characters). */
+  showBow?: boolean;
 }
 
 /**
  * Dusty — caramel cavoodle. Uses the official illustrated portrait,
  * with a small colored bowtie overlay matching the next bubble.
  */
-export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props) {
+export function Dusty({ size = 140, mood = "idle", ballColor, className, characterId, showBow = true }: Props) {
   const wrapAnim = mood === "happy" ? "animate-wiggle" : "";
   const bowFill = ballColor ? COLOR_HSL[ballColor] : "hsl(var(--primary))";
-  // Resolve sprite via the active-character lookup. With active = "dusty"
-  // this returns the same imported asset as before — behaviour unchanged.
-  const character = getCharacterById(getActiveCharacterId());
+  // Resolve sprite via the character lookup. With no override and active =
+  // "dusty" this returns the same imported asset as before — behaviour
+  // unchanged.
+  const resolvedId = characterId ?? getActiveCharacterId();
+  const character = getCharacterById(resolvedId);
   const dustyImg = character.spriteRef;
   // Image aspect ~422:677
   const w = size;
@@ -32,14 +38,14 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props
     >
       <img
         src={dustyImg}
-        alt={`${character.name} the caramel cavoodle`}
+        alt={character.name}
         width={w}
         height={h}
         draggable={false}
         className="block h-full w-full select-none"
       />
       {/* Bowtie overlay — color matches the bubble Dusty is about to throw */}
-      <svg
+      {showBow && <svg
         viewBox="0 0 100 40"
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
         style={{ top: `${h * 0.42}px`, width: `${w * 0.55}px`, height: "auto" }}
@@ -60,7 +66,7 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props
         />
         <circle cx="50" cy="20" r="9" fill={bowFill} stroke="rgba(0,0,0,0.25)" strokeWidth="1.5" />
         <circle cx="47" cy="17" r="2.5" fill="rgba(255,255,255,0.7)" />
-      </svg>
+      </svg>}
     </div>
   );
 }
