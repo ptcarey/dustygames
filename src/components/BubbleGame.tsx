@@ -218,8 +218,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       const p = s.projectile;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (p.x < grid.radius) { p.x = grid.radius; p.vx = -p.vx; }
-      if (p.x > s.canvasW - grid.radius) { p.x = s.canvasW - grid.radius; p.vx = -p.vx; }
+      if (p.x < grid.radius) {
+        p.x = grid.radius; p.vx = -p.vx;
+        if (p.zigzag) p.zigzag.dir = (p.zigzag.dir === 1 ? -1 : 1);
+      }
+      if (p.x > s.canvasW - grid.radius) {
+        p.x = s.canvasW - grid.radius; p.vx = -p.vx;
+        if (p.zigzag) p.zigzag.dir = (p.zigzag.dir === 1 ? -1 : 1);
+      }
 
       if (p.zigzag) {
         // Will's Zigzag Zapper: pop bubbles touched along the way; flip
@@ -245,8 +251,13 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           p.vx = Math.sin(ang) * speed * z.dir;
           p.vy = -Math.cos(ang) * speed;
         }
+        // Keep zig-zagging upward until the projectile reaches the top of
+        // the playfield. The 8-row spec from the original brief produced a
+        // mid-air vanish in tall/empty levels; the projectile now always
+        // travels the full way up before the terminal explosion.
         const reachedTop = p.y <= grid.radius + 8;
-        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
+        if (reachedTop) {
+          p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
         }
@@ -357,6 +368,25 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   ) => {
     const s = stateRef.current;
     const grid = s.grid!;
+    // Always spawn a visible burst at the detonation point so the player
+    // sees Will's bubble explode (otherwise an empty-area detonation would
+    // look like the ball just disappeared).
+    const burstPieces = 18;
+    for (let k = 0; k < burstPieces; k++) {
+      const ang = (Math.PI * 2 * k) / burstPieces + Math.random() * 0.3;
+      const speed = 200 + Math.random() * 220;
+      s.particles.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed - 80,
+        color: p.color,
+        born: performance.now(),
+        life: 700 + Math.random() * 240,
+        size: 4 + Math.random() * 3,
+      });
+    }
+    Sfx.pop(0);
+
     const radiusPx = z.behavior.explosionRadius * grid.diameter + grid.radius * 0.5;
     const idsToPop = new Set<number>(z.poppedIds);
     for (const b of grid.bubbles) {
@@ -366,7 +396,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
     const popped = grid.bubbles.filter(b => idsToPop.has(b.id));
     if (popped.length === 0) {
-      // No-op explosion — still consume the shot.
+      // Empty-area detonation — still consume the shot. The burst above
+      // gives the player visual feedback that the bubble exploded.
       tickAfterShot(false);
       return;
     }
