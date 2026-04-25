@@ -346,6 +346,77 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
   };
 
+  /**
+   * Will's Zigzag Zapper terminal explosion. Pops every bubble already
+   * marked along the projectile's path plus every bubble within
+   * `explosionRadius` diameters of the explosion point, then runs the
+   * standard floater pass and ticks the shot counter.
+   */
+  const detonateZigzag = (
+    p: { x: number; y: number; color: BubbleColor },
+    z: NonNullable<NonNullable<typeof stateRef.current.projectile>["zigzag"]>,
+  ) => {
+    const s = stateRef.current;
+    const grid = s.grid!;
+    const radiusPx = z.behavior.explosionRadius * grid.diameter + grid.radius * 0.5;
+    const idsToPop = new Set<number>(z.poppedIds);
+    for (const b of grid.bubbles) {
+      if (idsToPop.has(b.id)) continue;
+      const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+      if (dx * dx + dy * dy <= radiusPx * radiusPx) idsToPop.add(b.id);
+    }
+    const popped = grid.bubbles.filter(b => idsToPop.has(b.id));
+    if (popped.length === 0) {
+      // No-op explosion — still consume the shot.
+      tickAfterShot(false);
+      return;
+    }
+    grid.bubbles = grid.bubbles.filter(b => !idsToPop.has(b.id));
+
+    let chainTotal = 0;
+    popped.forEach((b, i) => {
+      chainTotal += (i + 1) * 10;
+      const px = b.x, py = b.y + s.scrollY;
+      s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
+      const pieces = 8;
+      for (let k = 0; k < pieces; k++) {
+        const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
+        const speed = 140 + Math.random() * 180;
+        s.particles.push({
+          x: px, y: py,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 60,
+          color: b.color,
+          born: performance.now() + i * 30,
+          life: 600 + Math.random() * 200,
+          size: 3 + Math.random() * 3,
+        });
+      }
+      setTimeout(() => Sfx.pop(i), i * 40);
+      if (b.hasPossum) {
+        s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
+        setPossumsLeft(pl => Math.max(0, pl - 1));
+        setTimeout(() => Sfx.squeak(), i * 40 + 60);
+      }
+    });
+    setScore(sc => sc + chainTotal);
+    flashHappy();
+
+    const floaters = findFloaters(grid);
+    if (floaters.length) {
+      const fIds = new Set(floaters.map(b => b.id));
+      grid.bubbles = grid.bubbles.filter(b => !fIds.has(b.id));
+      floaters.forEach(b => s.falling.push({ ...b, y: b.y + s.scrollY, vy: 0 }));
+      setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (popped.length + i + 1) * 10, 0));
+    }
+
+    // Will's pops + drops also count toward Dusty's unlock counter — but
+    // since Will only fires once already unlocked, the counter is only
+    // gameplay-relevant while Dusty is active.
+    setPopOrDropCount(c => c + popped.length + floaters.length);
+    tickAfterShot(true);
+  };
+
   const processChain = (cluster: Bubble[]) => {
     const s = stateRef.current;
     const grid = s.grid!;
