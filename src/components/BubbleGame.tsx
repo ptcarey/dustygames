@@ -34,6 +34,8 @@ const SHOOT_SPEED = 900; // px/sec
 const WILL_LEVELS: ReadonlySet<number> = new Set([5, 6, 7, 8, 9, 10]);
 /** Pops or drops Dusty must produce before Will becomes selectable. */
 const WILL_UNLOCK_THRESHOLD = 3;
+/** Pops Dusty must produce after a Will use before Will reactivates. */
+const WILL_REACTIVATE_THRESHOLD = 10;
 
 export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,10 +97,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   // Will is shown on screen but dimmed/inactive.
   const willOnThisLevel = WILL_LEVELS.has(level.id);
   const [popOrDropCount, setPopOrDropCount] = useState(0);
-  // Will may only fire once per level on his eligible levels (5–10). After
-  // his shot lands, the active thrower flips back to Dusty and Will becomes
-  // un-selectable for the rest of the level.
-  const [willUsedThisLevel, setWillUsedThisLevel] = useState(false);
+  // Cooldown baseline: when Will fires, we record the current pop count.
+  // Will reactivates once `popOrDropCount` has grown by
+  // WILL_REACTIVATE_THRESHOLD beyond that baseline. Null = Will has not yet
+  // been used this level (initial unlock uses WILL_UNLOCK_THRESHOLD).
+  const [willCooldownBaseline, setWillCooldownBaseline] = useState<number | null>(null);
   const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
     // Reset to Dusty whenever the player enters a level — Will must be
     // re-unlocked each level.
@@ -106,7 +109,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     return "dusty";
   });
   const willAvailable =
-    willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD && !willUsedThisLevel;
+    willOnThisLevel &&
+    (willCooldownBaseline === null
+      ? popOrDropCount >= WILL_UNLOCK_THRESHOLD
+      : popOrDropCount - willCooldownBaseline >= WILL_REACTIVATE_THRESHOLD);
   const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
   const activeCharacter = getCharacterById(activeThrowerId);
   const projectileBehavior = useMemo(
