@@ -4,6 +4,7 @@
  */
 import type { Character } from "@/game/types";
 import dustySprite from "@/assets/dusty.png";
+import willSprite from "@/assets/will.png";
 
 export const CHARACTERS: readonly Character[] = [
   {
@@ -15,6 +16,17 @@ export const CHARACTERS: readonly Character[] = [
     spriteRef: dustySprite,
     abilityIds: [],
     voiceLines: [],
+  },
+  {
+    id: "will",
+    name: "Will",
+    // Cheeky black toy poodle — themed against the existing accent token so
+    // it stays consistent with the design system (HSL via CSS var).
+    themeColor: "hsl(var(--accent))",
+    spriteRef: willSprite,
+    abilityIds: ["zigzag-zapper"],
+    voiceLines: [],
+    backstory: "A cheeky toy poodle who zig-zags his bubbles for maximum mischief.",
   },
 ] as const;
 
