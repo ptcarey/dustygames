@@ -29,19 +29,33 @@ export const abilityRegistry: Record<string, AbilityFn> = {};
  * `abilityRegistry` because projectile behaviors are pure data the engine
  * reads at fire-time (movement spec + landing rule), not per-frame mutators.
  */
-export interface ProjectileBehavior {
-  kind: "zigzag-explode";
-  /** Number of grid rows the projectile travels before exploding. */
-  rowsBeforeExplode: number;
-  /** Radius (in bubble diameters) of the terminal explosion. */
-  explosionRadius: number;
-}
+export type ProjectileBehavior =
+  | { kind: "zigzag-explode"; rowsBeforeExplode: number; explosionRadius: number }
+  | { kind: "love-bomb"; explosionRadius: number; ignoresColorMatch: true }
+  | { kind: "triple-fan-orbit"; fanAngleDeg: number; orbitingFlankers: boolean }
+  | { kind: "scatter-shot"; totalProjectiles: number; angleBetweenDeg: number; ignoresColorMatch: true };
 
 export const projectileBehaviorRegistry: Record<string, ProjectileBehavior> = {
   "zigzag-zapper": {
     kind: "zigzag-explode",
     rowsBeforeExplode: 7,
     explosionRadius: 1,
+  },
+  "love-bomb": {
+    kind: "love-bomb",
+    explosionRadius: 2,
+    ignoresColorMatch: true,
+  },
+  "triple-guard": {
+    kind: "triple-fan-orbit",
+    fanAngleDeg: 30,
+    orbitingFlankers: true,
+  },
+  "scatter-shot": {
+    kind: "scatter-shot",
+    totalProjectiles: 7,
+    angleBetweenDeg: 7,
+    ignoresColorMatch: true,
   },
 };
 

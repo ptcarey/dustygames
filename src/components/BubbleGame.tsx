@@ -11,9 +11,11 @@ import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
-import { getCharacterById } from "@/characters/characters";
+import { getCharacterById, getCompanionForLevel } from "@/characters/characters";
 import { setActiveCharacterId } from "@/game/storage";
 import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
+import { FarewellScreen } from "./FarewellScreen";
+import type { Character } from "@/game/types";
 
 interface Props {
   level: LevelConfig;
@@ -23,6 +25,7 @@ interface Props {
   onNext: () => void;
   onExit: () => void;
   onMenu: () => void;
+  onFarewell?: (character: Character) => void;
 }
 
 interface SavedPossum { id: number; x: number; y: number; born: number; }
@@ -30,14 +33,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
-/** Levels on which Will joins the game as a selectable second thrower. */
-const WILL_LEVELS: ReadonlySet<number> = new Set([5, 6, 7, 8, 9, 10]);
-/** Pops or drops Dusty must produce before Will becomes selectable. */
-const WILL_UNLOCK_THRESHOLD = 3;
-/** Pops Dusty must produce after a Will use before Will reactivates. */
-const WILL_REACTIVATE_THRESHOLD = 10;
-
-export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
+export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu, onFarewell }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -53,7 +49,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       x: number; y: number; vx: number; vy: number; color: BubbleColor;
       // Optional zig-zag flight (Will's Zigzag Zapper ability).
       zigzag?: {
-        behavior: ProjectileBehavior;
+        behavior: Extract<ProjectileBehavior, { kind: "zigzag-explode" }>;
         startY: number;
         rowsTravelled: number;
         nextRowY: number;        // y at which to flip horizontal direction
@@ -94,28 +90,33 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   const [ballColor, setBallColor] = useState<BubbleColor>("red");
   const [nextBallColor, setNextBallColor] = useState<BubbleColor>("blue");
 
-  // Will joins the game on levels 5–10. Dusty must pop or drop
-  // WILL_UNLOCK_THRESHOLD bubbles before Will becomes selectable; until then
-  // Will is shown on screen but dimmed/inactive.
-  const willOnThisLevel = WILL_LEVELS.has(level.id);
+  // The active companion (if any) is fully data-driven — derived from the
+  // character config's `availability.levels` range. A null companion means
+  // Dusty plays this level alone.
+  const companion = useMemo(() => getCompanionForLevel(level.id), [level.id]);
+  const companionOnThisLevel = companion !== null;
+  const companionUnlockThreshold = companion?.availability?.initialUnlock.count ?? 0;
+  const companionReactivateThreshold = companion?.availability?.reactivation.count ?? 0;
   const [popOrDropCount, setPopOrDropCount] = useState(0);
-  // Cooldown baseline: when Will fires, we record the current pop count.
-  // Will reactivates once `popOrDropCount` has grown by
-  // WILL_REACTIVATE_THRESHOLD beyond that baseline. Null = Will has not yet
-  // been used this level (initial unlock uses WILL_UNLOCK_THRESHOLD).
-  const [willCooldownBaseline, setWillCooldownBaseline] = useState<number | null>(null);
+  // Cooldown baseline: when the companion fires, we record the current pop
+  // count. The companion reactivates once `popOrDropCount` has grown by
+  // `companionReactivateThreshold` beyond that baseline. Null = companion
+  // has not yet been used this level (initial unlock uses
+  // `companionUnlockThreshold`).
+  const [companionCooldownBaseline, setCompanionCooldownBaseline] = useState<number | null>(null);
   const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
-    // Reset to Dusty whenever the player enters a level — Will must be
-    // re-unlocked each level.
+    // Reset to Dusty whenever the player enters a level — the companion
+    // must be re-unlocked each level.
     setActiveCharacterId("dusty");
     return "dusty";
   });
-  const willAvailable =
-    willOnThisLevel &&
-    (willCooldownBaseline === null
-      ? popOrDropCount >= WILL_UNLOCK_THRESHOLD
-      : popOrDropCount - willCooldownBaseline >= WILL_REACTIVATE_THRESHOLD);
-  const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
+  const companionAvailable =
+    companionOnThisLevel &&
+    (companionCooldownBaseline === null
+      ? popOrDropCount >= companionUnlockThreshold
+      : popOrDropCount - companionCooldownBaseline >= companionReactivateThreshold);
+  const companionId = companion?.id ?? "dusty";
+  const waitingCharacterId = activeThrowerId === "dusty" ? companionId : "dusty";
   const activeCharacter = getCharacterById(activeThrowerId);
   const projectileBehavior = useMemo(
     () => getProjectileBehaviorForAbilities(activeCharacter.abilityIds),
@@ -123,22 +124,27 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   );
 
   const swapThrower = useCallback(() => {
-    // Allow swapping in either direction while Will is available. Swapping
-    // away from Will (back to Dusty) is always allowed, even after Will is
-    // used, so the player isn't trapped on the Will sprite.
-    if (!willOnThisLevel) return;
+    // Allow swapping in either direction while the companion is available.
+    // Swapping back to Dusty is always allowed, even after the companion
+    // is used, so the player isn't trapped on the companion sprite.
+    if (!companionOnThisLevel) return;
     const s = stateRef.current;
     if (s.projectile) return; // can't swap mid-shot
-    const nextId = activeThrowerId === "dusty" ? "will" : "dusty";
-    if (nextId === "will" && !willAvailable) return;
+    const nextId = activeThrowerId === "dusty" ? companionId : "dusty";
+    if (nextId === companionId && !companionAvailable) return;
     setActiveCharacterId(nextId);
     setActiveThrowerIdState(nextId);
     Sfx.click();
-  }, [activeThrowerId, willAvailable, willOnThisLevel]);
+  }, [activeThrowerId, companionAvailable, companionOnThisLevel, companionId]);
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
-  useEffect(() => { onWinRef.current = onWin; onLoseRef.current = onLose; });
+  const onFarewellRef = useRef(onFarewell);
+  useEffect(() => {
+    onWinRef.current = onWin;
+    onLoseRef.current = onLose;
+    onFarewellRef.current = onFarewell;
+  });
 
   useEffect(() => { setSoundEnabled(audioEnabled); }, [audioEnabled]);
 
@@ -174,10 +180,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     setScore(0);
     setPossumsLeft(grid.bubbles.filter(b => b.hasPossum).length);
     setOverlay(null);
-    // Reset Will-related state — pop counter resets per level, and the
-    // active thrower returns to Dusty so Will must be re-earned.
+    // Reset companion-related state — pop counter resets per level, and
+    // the active thrower returns to Dusty so the companion must be
+    // re-earned.
     setPopOrDropCount(0);
-    setWillCooldownBaseline(null);
+    setCompanionCooldownBaseline(null);
     setActiveCharacterId("dusty");
     setActiveThrowerIdState("dusty");
   }, [level]);
@@ -546,6 +553,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       Sfx.win();
       setOverlay("win");
       onWinRef.current(scoreRef.current);
+      if (companion && companion.availability && level.id === companion.availability.levels.to) {
+        onFarewellRef.current?.(companion);
+      }
       return;
     }
     if (shots <= 0 && !s.projectile) {
@@ -811,13 +821,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           wobble,
         },
       };
-      // Will fires once per level on his eligible levels — mark him used
-      // immediately and flip the active thrower back to Dusty so the next
-      // shot uses Dusty's normal projectile.
-      if (willOnThisLevel && activeThrowerId === "will") {
-        // Start the reactivation cooldown — Will returns once Dusty pops
-        // WILL_REACTIVATE_THRESHOLD more bubbles after this point.
-        setWillCooldownBaseline(popOrDropCount);
+      // Companion fires — start the reactivation cooldown and flip the
+      // active thrower back to Dusty so the next shot uses Dusty's normal
+      // projectile.
+      if (companionOnThisLevel && activeThrowerId === companionId) {
+        setCompanionCooldownBaseline(popOrDropCount);
         setActiveCharacterId("dusty");
         setActiveThrowerIdState("dusty");
       }
@@ -860,27 +868,27 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           />
         </div>
 
-        {/* Waiting character — shown on Will-eligible levels. Dimmed and
-            non-interactive until Will is unlocked, then becomes a tap target
+        {/* Waiting companion — shown on companion-eligible levels. Dimmed
+            and non-interactive until unlocked, then becomes a tap target
             that swaps the active thrower. */}
-        {willOnThisLevel && (
+        {companionOnThisLevel && companion && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); swapThrower(); }}
             onPointerDown={(e) => e.stopPropagation()}
-            disabled={!willAvailable || !!overlay || !!stateRef.current.projectile}
+            disabled={!companionAvailable || !!overlay || !!stateRef.current.projectile}
             aria-label={(() => {
-              if (willAvailable) return `Swap to ${getCharacterById(waitingCharacterId).name}`;
-              const remaining = willCooldownBaseline === null
-                ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
-                : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline));
-              return `${getCharacterById(waitingCharacterId).name} — pop ${remaining} more to unlock`;
+              if (companionAvailable) return `Swap to ${companion.name}`;
+              const remaining = companionCooldownBaseline === null
+                ? Math.max(0, companionUnlockThreshold - popOrDropCount)
+                : Math.max(0, companionReactivateThreshold - (popOrDropCount - companionCooldownBaseline));
+              return `${companion.name} — pop ${remaining} more to unlock`;
             })()}
             className={`absolute bottom-2 left-2 z-10 flex flex-col items-center rounded-2xl bg-white/70 p-1 shadow-md backdrop-blur transition-transform ${
-              willAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
+              companionAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
             }`}
           >
-            <div className={willAvailable ? "" : "opacity-40 grayscale"}>
+            <div className={companionAvailable ? "" : "opacity-40 grayscale"}>
               <Dusty
                 size={64}
                 mood="idle"
@@ -889,12 +897,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
               />
             </div>
             <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
-              {willAvailable
-                ? `Tap ${getCharacterById(waitingCharacterId).name}`
+              {companionAvailable
+                ? `Tap ${companion.name}`
                 : `${
-                    willCooldownBaseline === null
-                      ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
-                      : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline))
+                    companionCooldownBaseline === null
+                      ? Math.max(0, companionUnlockThreshold - popOrDropCount)
+                      : Math.max(0, companionReactivateThreshold - (popOrDropCount - companionCooldownBaseline))
                   } to go`}
             </span>
           </button>
@@ -977,7 +985,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       </div>
 
       {overlay === "win" && (
-        level.id === 60 ? (
+        companion && companion.availability && level.id === companion.availability.levels.to ? (
+          <FarewellScreen character={companion} onContinue={onNext} />
+        ) : level.id === 60 ? (
           <Overlay
             title="💖 Dusty found Matilda!"
             subtitle={`Reunited at last! Final score: ${score}`}
