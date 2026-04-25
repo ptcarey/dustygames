@@ -5,6 +5,8 @@ import type { GameSave } from "./types";
 import { TOTAL_LEVELS } from "./levels";
 
 const KEY = "dusty-bubble-pop-save-v1";
+const ACTIVE_CHARACTER_KEY = "dusty-bubble-pop-active-character-v1";
+const DEFAULT_ACTIVE_CHARACTER_ID = "dusty";
 
 // During development all levels are unlocked so we can jump straight to any
 // level for testing. In production the player must earn each unlock.
@@ -63,4 +65,24 @@ export function setLastPlayedLevel(levelId: number) {
   const s = loadSave();
   s.lastPlayedLevel = levelId;
   writeSave(s);
+}
+
+/**
+ * Active character id. Stored separately from GameSave so adding/removing
+ * the concept doesn't migrate the save shape. Defaults to "dusty".
+ */
+export function getActiveCharacterId(): string {
+  try {
+    return localStorage.getItem(ACTIVE_CHARACTER_KEY) ?? DEFAULT_ACTIVE_CHARACTER_ID;
+  } catch {
+    return DEFAULT_ACTIVE_CHARACTER_ID;
+  }
+}
+
+export function setActiveCharacterId(id: string) {
+  try {
+    localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
+  } catch {
+    // storage may be unavailable; silently ignore
+  }
 }
