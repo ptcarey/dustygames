@@ -773,25 +773,36 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     vy = (vy / mag) * SHOOT_SPEED;
     if (projectileBehavior && projectileBehavior.kind === "zigzag-explode") {
       const grid = s.grid!;
-      // Start the zigzag straight up; the first row crossing flips the
-      // diagonal in `dir`. Begin with dir = -1 so the first leg goes left.
+      // Player-directed: take the first leg in the aimed horizontal
+      // direction (left if vx < 0, otherwise right). The bubble still
+      // travels predominantly upward but zig-zags around the aimed line.
       const speed = SHOOT_SPEED;
+      const initialDir: 1 | -1 = vx < 0 ? -1 : 1;
+      const ang = Math.PI * 0.32;
       s.projectile = {
         x: s.shooterX,
         y: s.shooterY,
-        vx: 0,
-        vy: -speed,
+        vx: Math.sin(ang) * speed * initialDir,
+        vy: -Math.cos(ang) * speed,
         color: s.currentColor,
         zigzag: {
           behavior: projectileBehavior,
           startY: s.shooterY,
           rowsTravelled: 0,
           nextRowY: s.shooterY - grid.rowHeight,
-          dir: -1,
+          dir: initialDir,
           poppedIds: new Set<number>(),
           baseSpeed: speed,
         },
       };
+      // Will fires once per level on his eligible levels — mark him used
+      // immediately and flip the active thrower back to Dusty so the next
+      // shot uses Dusty's normal projectile.
+      if (willOnThisLevel && activeThrowerId === "will") {
+        setWillUsedThisLevel(true);
+        setActiveCharacterId("dusty");
+        setActiveThrowerIdState("dusty");
+      }
     } else {
       s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
     }
