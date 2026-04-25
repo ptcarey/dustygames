@@ -60,6 +60,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         dir: 1 | -1;             // current horizontal direction
         poppedIds: Set<number>;  // bubbles already popped along the path
         baseSpeed: number;
+        aimFromVertical: number; // player's aim angle (0 = straight up, neg = left)
+        wobble: number;          // zigzag amplitude added/subtracted from aim
       };
     } | null;
     aiming: boolean;
