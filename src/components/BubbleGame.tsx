@@ -139,7 +139,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
-  useEffect(() => { onWinRef.current = onWin; onLoseRef.current = onLose; });
+  const onFarewellRef = useRef(onFarewell);
+  useEffect(() => {
+    onWinRef.current = onWin;
+    onLoseRef.current = onLose;
+    onFarewellRef.current = onFarewell;
+  });
 
   useEffect(() => { setSoundEnabled(audioEnabled); }, [audioEnabled]);
 
@@ -548,6 +553,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       Sfx.win();
       setOverlay("win");
       onWinRef.current(scoreRef.current);
+      if (companion && companion.availability && level.id === companion.availability.levels.to) {
+        onFarewellRef.current?.(companion);
+      }
       return;
     }
     if (shots <= 0 && !s.projectile) {
