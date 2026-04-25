@@ -48,3 +48,20 @@ export interface GameSave {
   audioEnabled: boolean;
   lastPlayedLevel: number; // most recently entered level (for map auto-scroll)
 }
+
+/**
+ * Character — data-driven definition of a playable character.
+ * Today only Dusty exists; the type exists so future characters can be
+ * added without touching the engine or UI.
+ */
+export interface Character {
+  id: string;
+  name: string;
+  /** Theme colour. Matches the project convention: a CSS hsl() string (see COLOR_HSL). */
+  themeColor: string;
+  /** Sprite reference. Matches the Dusty component scheme: an imported asset module URL. */
+  spriteRef: string;
+  abilityIds: string[];
+  voiceLines?: string[];
+  backstory?: string;
+}

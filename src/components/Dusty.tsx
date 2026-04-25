@@ -1,5 +1,6 @@
 import { COLOR_HSL, type BubbleColor } from "@/game/types";
-import dustyImg from "@/assets/dusty.png";
+import { getActiveCharacterId } from "@/game/storage";
+import { getCharacterById } from "@/characters/characters";
 
 interface Props {
   size?: number;
@@ -17,6 +18,10 @@ interface Props {
 export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props) {
   const wrapAnim = mood === "happy" ? "animate-wiggle" : "";
   const bowFill = ballColor ? COLOR_HSL[ballColor] : "hsl(var(--primary))";
+  // Resolve sprite via the active-character lookup. With active = "dusty"
+  // this returns the same imported asset as before — behaviour unchanged.
+  const character = getCharacterById(getActiveCharacterId());
+  const dustyImg = character.spriteRef;
   // Image aspect ~422:677
   const w = size;
   const h = Math.round(size * (677 / 422));
@@ -27,7 +32,7 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className }: Props
     >
       <img
         src={dustyImg}
-        alt="Dusty the caramel cavoodle"
+        alt={`${character.name} the caramel cavoodle`}
         width={w}
         height={h}
         draggable={false}
