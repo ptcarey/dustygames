@@ -11,6 +11,10 @@ import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
+import { CHARACTERS, getCharacterById } from "@/characters/characters";
+import { getActiveCharacterId, setActiveCharacterId } from "@/game/storage";
+import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
+import { neighborsOf } from "@/game/engine";
 
 interface Props {
   level: LevelConfig;
@@ -27,6 +31,11 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
+/** Levels on which Will joins the game as a selectable second thrower. */
+const WILL_LEVELS: ReadonlySet<number> = new Set([5, 6, 7, 8, 9, 10]);
+/** Pops or drops Dusty must produce before Will becomes selectable. */
+const WILL_UNLOCK_THRESHOLD = 3;
+
 export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,7 +48,19 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     shooterY: number;
     currentColor: BubbleColor;
     nextColor: BubbleColor;
-    projectile: { x: number; y: number; vx: number; vy: number; color: BubbleColor } | null;
+    projectile: {
+      x: number; y: number; vx: number; vy: number; color: BubbleColor;
+      // Optional zig-zag flight (Will's Zigzag Zapper ability).
+      zigzag?: {
+        behavior: ProjectileBehavior;
+        startY: number;
+        rowsTravelled: number;
+        nextRowY: number;        // y at which to flip horizontal direction
+        dir: 1 | -1;             // current horizontal direction
+        poppedIds: Set<number>;  // bubbles already popped along the path
+        baseSpeed: number;
+      };
+    } | null;
     aiming: boolean;
     aimAngle: number;
     popping: Array<Bubble & { popStart: number }>;
@@ -69,6 +90,35 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   const [overlay, setOverlay] = useState<"win" | "lose" | null>(null);
   const [ballColor, setBallColor] = useState<BubbleColor>("red");
   const [nextBallColor, setNextBallColor] = useState<BubbleColor>("blue");
+
+  // Will joins the game on levels 5–10. Dusty must pop or drop
+  // WILL_UNLOCK_THRESHOLD bubbles before Will becomes selectable; until then
+  // Will is shown on screen but dimmed/inactive.
+  const willOnThisLevel = WILL_LEVELS.has(level.id);
+  const [popOrDropCount, setPopOrDropCount] = useState(0);
+  const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
+    // Reset to Dusty whenever the player enters a level — Will must be
+    // re-unlocked each level.
+    setActiveCharacterId("dusty");
+    return "dusty";
+  });
+  const willAvailable = willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD;
+  const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
+  const activeCharacter = getCharacterById(activeThrowerId);
+  const projectileBehavior = useMemo(
+    () => getProjectileBehaviorForAbilities(activeCharacter.abilityIds),
+    [activeCharacter],
+  );
+
+  const swapThrower = useCallback(() => {
+    if (!willAvailable) return;
+    const s = stateRef.current;
+    if (s.projectile) return; // can't swap mid-shot
+    const nextId = activeThrowerId === "dusty" ? "will" : "dusty";
+    setActiveCharacterId(nextId);
+    setActiveThrowerIdState(nextId);
+    Sfx.click();
+  }, [activeThrowerId, willAvailable]);
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
@@ -108,6 +158,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     setScore(0);
     setPossumsLeft(grid.bubbles.filter(b => b.hasPossum).length);
     setOverlay(null);
+    // Reset Will-related state — pop counter resets per level, and the
+    // active thrower returns to Dusty so Will must be re-earned.
+    setPopOrDropCount(0);
+    setActiveCharacterId("dusty");
+    setActiveThrowerIdState("dusty");
   }, [level]);
 
   useEffect(() => {
