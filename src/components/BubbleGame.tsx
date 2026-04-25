@@ -169,6 +169,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     // Reset Will-related state — pop counter resets per level, and the
     // active thrower returns to Dusty so Will must be re-earned.
     setPopOrDropCount(0);
+    setWillUsedThisLevel(false);
     setActiveCharacterId("dusty");
     setActiveThrowerIdState("dusty");
   }, [level]);
