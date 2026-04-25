@@ -813,13 +813,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           wobble,
         },
       };
-      // Will fires once per level on his eligible levels — mark him used
-      // immediately and flip the active thrower back to Dusty so the next
-      // shot uses Dusty's normal projectile.
-      if (willOnThisLevel && activeThrowerId === "will") {
-        // Start the reactivation cooldown — Will returns once Dusty pops
-        // WILL_REACTIVATE_THRESHOLD more bubbles after this point.
-        setWillCooldownBaseline(popOrDropCount);
+      // Companion fires — start the reactivation cooldown and flip the
+      // active thrower back to Dusty so the next shot uses Dusty's normal
+      // projectile.
+      if (companionOnThisLevel && activeThrowerId === companionId) {
+        setCompanionCooldownBaseline(popOrDropCount);
         setActiveCharacterId("dusty");
         setActiveThrowerIdState("dusty");
       }
@@ -862,27 +860,27 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           />
         </div>
 
-        {/* Waiting character — shown on Will-eligible levels. Dimmed and
-            non-interactive until Will is unlocked, then becomes a tap target
+        {/* Waiting companion — shown on companion-eligible levels. Dimmed
+            and non-interactive until unlocked, then becomes a tap target
             that swaps the active thrower. */}
-        {willOnThisLevel && (
+        {companionOnThisLevel && companion && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); swapThrower(); }}
             onPointerDown={(e) => e.stopPropagation()}
-            disabled={!willAvailable || !!overlay || !!stateRef.current.projectile}
+            disabled={!companionAvailable || !!overlay || !!stateRef.current.projectile}
             aria-label={(() => {
-              if (willAvailable) return `Swap to ${getCharacterById(waitingCharacterId).name}`;
-              const remaining = willCooldownBaseline === null
-                ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
-                : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline));
-              return `${getCharacterById(waitingCharacterId).name} — pop ${remaining} more to unlock`;
+              if (companionAvailable) return `Swap to ${companion.name}`;
+              const remaining = companionCooldownBaseline === null
+                ? Math.max(0, companionUnlockThreshold - popOrDropCount)
+                : Math.max(0, companionReactivateThreshold - (popOrDropCount - companionCooldownBaseline));
+              return `${companion.name} — pop ${remaining} more to unlock`;
             })()}
             className={`absolute bottom-2 left-2 z-10 flex flex-col items-center rounded-2xl bg-white/70 p-1 shadow-md backdrop-blur transition-transform ${
-              willAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
+              companionAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
             }`}
           >
-            <div className={willAvailable ? "" : "opacity-40 grayscale"}>
+            <div className={companionAvailable ? "" : "opacity-40 grayscale"}>
               <Dusty
                 size={64}
                 mood="idle"
@@ -891,12 +889,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
               />
             </div>
             <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
-              {willAvailable
-                ? `Tap ${getCharacterById(waitingCharacterId).name}`
+              {companionAvailable
+                ? `Tap ${companion.name}`
                 : `${
-                    willCooldownBaseline === null
-                      ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
-                      : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline))
+                    companionCooldownBaseline === null
+                      ? Math.max(0, companionUnlockThreshold - popOrDropCount)
+                      : Math.max(0, companionReactivateThreshold - (popOrDropCount - companionCooldownBaseline))
                   } to go`}
             </span>
           </button>
