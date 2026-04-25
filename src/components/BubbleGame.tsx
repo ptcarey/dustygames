@@ -468,6 +468,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (cluster.length + i + 1) * 10, 0));
     }
 
+    // Track pops/drops for the Will-unlock condition. Counts every bubble
+    // popped in a normal color chain plus any floaters dropped.
+    setPopOrDropCount(c => c + cluster.length + floaters.length);
+
     tickAfterShot(true);
   };
 
@@ -727,7 +731,30 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     const mag = Math.hypot(vx, vy);
     vx = (vx / mag) * SHOOT_SPEED;
     vy = (vy / mag) * SHOOT_SPEED;
-    s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
+    if (projectileBehavior && projectileBehavior.kind === "zigzag-explode") {
+      const grid = s.grid!;
+      // Start the zigzag straight up; the first row crossing flips the
+      // diagonal in `dir`. Begin with dir = -1 so the first leg goes left.
+      const speed = SHOOT_SPEED;
+      s.projectile = {
+        x: s.shooterX,
+        y: s.shooterY,
+        vx: 0,
+        vy: -speed,
+        color: s.currentColor,
+        zigzag: {
+          behavior: projectileBehavior,
+          startY: s.shooterY,
+          rowsTravelled: 0,
+          nextRowY: s.shooterY - grid.rowHeight,
+          dir: -1,
+          poppedIds: new Set<number>(),
+          baseSpeed: speed,
+        },
+      };
+    } else {
+      s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
+    }
     Sfx.shoot();
   };
 
