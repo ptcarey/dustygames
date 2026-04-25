@@ -218,8 +218,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       const p = s.projectile;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (p.x < grid.radius) { p.x = grid.radius; p.vx = -p.vx; }
-      if (p.x > s.canvasW - grid.radius) { p.x = s.canvasW - grid.radius; p.vx = -p.vx; }
+      if (p.x < grid.radius) {
+        p.x = grid.radius; p.vx = -p.vx;
+        if (p.zigzag) p.zigzag.dir = (p.zigzag.dir === 1 ? -1 : 1);
+      }
+      if (p.x > s.canvasW - grid.radius) {
+        p.x = s.canvasW - grid.radius; p.vx = -p.vx;
+        if (p.zigzag) p.zigzag.dir = (p.zigzag.dir === 1 ? -1 : 1);
+      }
 
       if (p.zigzag) {
         // Will's Zigzag Zapper: pop bubbles touched along the way; flip
@@ -245,8 +251,13 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           p.vx = Math.sin(ang) * speed * z.dir;
           p.vy = -Math.cos(ang) * speed;
         }
+        // Keep zig-zagging upward until the projectile reaches the top of
+        // the playfield. The 8-row spec from the original brief produced a
+        // mid-air vanish in tall/empty levels; the projectile now always
+        // travels the full way up before the terminal explosion.
         const reachedTop = p.y <= grid.radius + 8;
-        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
+        if (reachedTop) {
+          p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
         }
