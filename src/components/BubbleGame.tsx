@@ -261,12 +261,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           p.vx = Math.sin(ang) * speed * z.dir;
           p.vy = -Math.cos(ang) * speed;
         }
-        // Keep zig-zagging upward until the projectile reaches the top of
-        // the playfield. The 8-row spec from the original brief produced a
-        // mid-air vanish in tall/empty levels; the projectile now always
-        // travels the full way up before the terminal explosion.
+        // Terminate after travelling rowsBeforeExplode rows OR on hitting
+        // the ceiling, whichever comes first.
         const reachedTop = p.y <= grid.radius + 8;
-        if (reachedTop) {
+        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
           p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
