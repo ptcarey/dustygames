@@ -368,6 +368,25 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   ) => {
     const s = stateRef.current;
     const grid = s.grid!;
+    // Always spawn a visible burst at the detonation point so the player
+    // sees Will's bubble explode (otherwise an empty-area detonation would
+    // look like the ball just disappeared).
+    const burstPieces = 18;
+    for (let k = 0; k < burstPieces; k++) {
+      const ang = (Math.PI * 2 * k) / burstPieces + Math.random() * 0.3;
+      const speed = 200 + Math.random() * 220;
+      s.particles.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed - 80,
+        color: p.color,
+        born: performance.now(),
+        life: 700 + Math.random() * 240,
+        size: 4 + Math.random() * 3,
+      });
+    }
+    Sfx.pop(0);
+
     const radiusPx = z.behavior.explosionRadius * grid.diameter + grid.radius * 0.5;
     const idsToPop = new Set<number>(z.poppedIds);
     for (const b of grid.bubbles) {
@@ -377,7 +396,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
     const popped = grid.bubbles.filter(b => idsToPop.has(b.id));
     if (popped.length === 0) {
-      // No-op explosion — still consume the shot.
+      // Empty-area detonation — still consume the shot. The burst above
+      // gives the player visual feedback that the bubble exploded.
       tickAfterShot(false);
       return;
     }
