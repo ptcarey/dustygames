@@ -265,7 +265,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         // the ceiling, whichever comes first.
         const reachedTop = p.y <= grid.radius + 8;
         if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
-          p.y = grid.radius + 8;
+          if (reachedTop) p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
         }
