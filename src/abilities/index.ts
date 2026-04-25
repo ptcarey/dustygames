@@ -40,7 +40,7 @@ export interface ProjectileBehavior {
 export const projectileBehaviorRegistry: Record<string, ProjectileBehavior> = {
   "zigzag-zapper": {
     kind: "zigzag-explode",
-    rowsBeforeExplode: 8,
+    rowsBeforeExplode: 7,
     explosionRadius: 1,
   },
 };
