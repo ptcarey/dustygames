@@ -11,6 +11,9 @@ import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
+import { getCharacterById } from "@/characters/characters";
+import { setActiveCharacterId } from "@/game/storage";
+import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
 
 interface Props {
   level: LevelConfig;
@@ -27,6 +30,11 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
+/** Levels on which Will joins the game as a selectable second thrower. */
+const WILL_LEVELS: ReadonlySet<number> = new Set([5, 6, 7, 8, 9, 10]);
+/** Pops or drops Dusty must produce before Will becomes selectable. */
+const WILL_UNLOCK_THRESHOLD = 3;
+
 export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,7 +47,19 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     shooterY: number;
     currentColor: BubbleColor;
     nextColor: BubbleColor;
-    projectile: { x: number; y: number; vx: number; vy: number; color: BubbleColor } | null;
+    projectile: {
+      x: number; y: number; vx: number; vy: number; color: BubbleColor;
+      // Optional zig-zag flight (Will's Zigzag Zapper ability).
+      zigzag?: {
+        behavior: ProjectileBehavior;
+        startY: number;
+        rowsTravelled: number;
+        nextRowY: number;        // y at which to flip horizontal direction
+        dir: 1 | -1;             // current horizontal direction
+        poppedIds: Set<number>;  // bubbles already popped along the path
+        baseSpeed: number;
+      };
+    } | null;
     aiming: boolean;
     aimAngle: number;
     popping: Array<Bubble & { popStart: number }>;
@@ -69,6 +89,35 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   const [overlay, setOverlay] = useState<"win" | "lose" | null>(null);
   const [ballColor, setBallColor] = useState<BubbleColor>("red");
   const [nextBallColor, setNextBallColor] = useState<BubbleColor>("blue");
+
+  // Will joins the game on levels 5–10. Dusty must pop or drop
+  // WILL_UNLOCK_THRESHOLD bubbles before Will becomes selectable; until then
+  // Will is shown on screen but dimmed/inactive.
+  const willOnThisLevel = WILL_LEVELS.has(level.id);
+  const [popOrDropCount, setPopOrDropCount] = useState(0);
+  const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
+    // Reset to Dusty whenever the player enters a level — Will must be
+    // re-unlocked each level.
+    setActiveCharacterId("dusty");
+    return "dusty";
+  });
+  const willAvailable = willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD;
+  const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
+  const activeCharacter = getCharacterById(activeThrowerId);
+  const projectileBehavior = useMemo(
+    () => getProjectileBehaviorForAbilities(activeCharacter.abilityIds),
+    [activeCharacter],
+  );
+
+  const swapThrower = useCallback(() => {
+    if (!willAvailable) return;
+    const s = stateRef.current;
+    if (s.projectile) return; // can't swap mid-shot
+    const nextId = activeThrowerId === "dusty" ? "will" : "dusty";
+    setActiveCharacterId(nextId);
+    setActiveThrowerIdState(nextId);
+    Sfx.click();
+  }, [activeThrowerId, willAvailable]);
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
@@ -108,6 +157,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     setScore(0);
     setPossumsLeft(grid.bubbles.filter(b => b.hasPossum).length);
     setOverlay(null);
+    // Reset Will-related state — pop counter resets per level, and the
+    // active thrower returns to Dusty so Will must be re-earned.
+    setPopOrDropCount(0);
+    setActiveCharacterId("dusty");
+    setActiveThrowerIdState("dusty");
   }, [level]);
 
   useEffect(() => {
@@ -167,15 +221,46 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       if (p.x < grid.radius) { p.x = grid.radius; p.vx = -p.vx; }
       if (p.x > s.canvasW - grid.radius) { p.x = s.canvasW - grid.radius; p.vx = -p.vx; }
 
-      let hit = false;
-      if (p.y <= grid.radius + 8) hit = true;
-      for (const b of grid.bubbles) {
-        const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
-        if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
-      }
-      if (hit) {
-        landProjectile(p);
-        s.projectile = null;
+      if (p.zigzag) {
+        // Will's Zigzag Zapper: pop bubbles touched along the way; flip
+        // horizontal direction every row; explode after rowsBeforeExplode.
+        const z = p.zigzag;
+        // Pop any bubble we directly contact along the path.
+        for (const b of grid.bubbles) {
+          if (z.poppedIds.has(b.id)) continue;
+          const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+          if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) {
+            z.poppedIds.add(b.id);
+          }
+        }
+        // When projectile crosses the next row threshold, flip direction
+        // and increment row counter.
+        if (p.y <= z.nextRowY) {
+          z.rowsTravelled += 1;
+          z.dir = (z.dir === 1 ? -1 : 1);
+          z.nextRowY -= grid.rowHeight;
+          // Re-aim: same upward speed, horizontal component diagonal.
+          const speed = z.baseSpeed;
+          const ang = Math.PI * 0.32; // ~58° from vertical
+          p.vx = Math.sin(ang) * speed * z.dir;
+          p.vy = -Math.cos(ang) * speed;
+        }
+        const reachedTop = p.y <= grid.radius + 8;
+        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
+          detonateZigzag(p, z);
+          s.projectile = null;
+        }
+      } else {
+        let hit = false;
+        if (p.y <= grid.radius + 8) hit = true;
+        for (const b of grid.bubbles) {
+          const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+          if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
+        }
+        if (hit) {
+          landProjectile(p);
+          s.projectile = null;
+        }
       }
     }
 
@@ -260,6 +345,77 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
   };
 
+  /**
+   * Will's Zigzag Zapper terminal explosion. Pops every bubble already
+   * marked along the projectile's path plus every bubble within
+   * `explosionRadius` diameters of the explosion point, then runs the
+   * standard floater pass and ticks the shot counter.
+   */
+  const detonateZigzag = (
+    p: { x: number; y: number; color: BubbleColor },
+    z: NonNullable<NonNullable<typeof stateRef.current.projectile>["zigzag"]>,
+  ) => {
+    const s = stateRef.current;
+    const grid = s.grid!;
+    const radiusPx = z.behavior.explosionRadius * grid.diameter + grid.radius * 0.5;
+    const idsToPop = new Set<number>(z.poppedIds);
+    for (const b of grid.bubbles) {
+      if (idsToPop.has(b.id)) continue;
+      const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+      if (dx * dx + dy * dy <= radiusPx * radiusPx) idsToPop.add(b.id);
+    }
+    const popped = grid.bubbles.filter(b => idsToPop.has(b.id));
+    if (popped.length === 0) {
+      // No-op explosion — still consume the shot.
+      tickAfterShot(false);
+      return;
+    }
+    grid.bubbles = grid.bubbles.filter(b => !idsToPop.has(b.id));
+
+    let chainTotal = 0;
+    popped.forEach((b, i) => {
+      chainTotal += (i + 1) * 10;
+      const px = b.x, py = b.y + s.scrollY;
+      s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
+      const pieces = 8;
+      for (let k = 0; k < pieces; k++) {
+        const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
+        const speed = 140 + Math.random() * 180;
+        s.particles.push({
+          x: px, y: py,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 60,
+          color: b.color,
+          born: performance.now() + i * 30,
+          life: 600 + Math.random() * 200,
+          size: 3 + Math.random() * 3,
+        });
+      }
+      setTimeout(() => Sfx.pop(i), i * 40);
+      if (b.hasPossum) {
+        s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
+        setPossumsLeft(pl => Math.max(0, pl - 1));
+        setTimeout(() => Sfx.squeak(), i * 40 + 60);
+      }
+    });
+    setScore(sc => sc + chainTotal);
+    flashHappy();
+
+    const floaters = findFloaters(grid);
+    if (floaters.length) {
+      const fIds = new Set(floaters.map(b => b.id));
+      grid.bubbles = grid.bubbles.filter(b => !fIds.has(b.id));
+      floaters.forEach(b => s.falling.push({ ...b, y: b.y + s.scrollY, vy: 0 }));
+      setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (popped.length + i + 1) * 10, 0));
+    }
+
+    // Will's pops + drops also count toward Dusty's unlock counter — but
+    // since Will only fires once already unlocked, the counter is only
+    // gameplay-relevant while Dusty is active.
+    setPopOrDropCount(c => c + popped.length + floaters.length);
+    tickAfterShot(true);
+  };
+
   const processChain = (cluster: Bubble[]) => {
     const s = stateRef.current;
     const grid = s.grid!;
@@ -310,6 +466,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       });
       setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (cluster.length + i + 1) * 10, 0));
     }
+
+    // Track pops/drops for the Will-unlock condition. Counts every bubble
+    // popped in a normal color chain plus any floaters dropped.
+    setPopOrDropCount(c => c + cluster.length + floaters.length);
 
     tickAfterShot(true);
   };
@@ -570,7 +730,30 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     const mag = Math.hypot(vx, vy);
     vx = (vx / mag) * SHOOT_SPEED;
     vy = (vy / mag) * SHOOT_SPEED;
-    s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
+    if (projectileBehavior && projectileBehavior.kind === "zigzag-explode") {
+      const grid = s.grid!;
+      // Start the zigzag straight up; the first row crossing flips the
+      // diagonal in `dir`. Begin with dir = -1 so the first leg goes left.
+      const speed = SHOOT_SPEED;
+      s.projectile = {
+        x: s.shooterX,
+        y: s.shooterY,
+        vx: 0,
+        vy: -speed,
+        color: s.currentColor,
+        zigzag: {
+          behavior: projectileBehavior,
+          startY: s.shooterY,
+          rowsTravelled: 0,
+          nextRowY: s.shooterY - grid.rowHeight,
+          dir: -1,
+          poppedIds: new Set<number>(),
+          baseSpeed: speed,
+        },
+      };
+    } else {
+      s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
+    }
     Sfx.shoot();
   };
 
@@ -599,8 +782,47 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           className={`pointer-events-none absolute bottom-0 left-1/2 z-0 -translate-x-1/2 ${overlay === "win" ? "animate-bounce-soft" : ""}`}
           style={{ marginBottom: -6 }}
         >
-          <Dusty size={112} mood={overlay === "win" ? "happy" : dustyMood} ballColor={ballColor} />
+          <Dusty
+            size={112}
+            mood={overlay === "win" ? "happy" : dustyMood}
+            ballColor={ballColor}
+            characterId={activeThrowerId}
+          />
         </div>
+
+        {/* Waiting character — shown on Will-eligible levels. Dimmed and
+            non-interactive until Will is unlocked, then becomes a tap target
+            that swaps the active thrower. */}
+        {willOnThisLevel && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); swapThrower(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            disabled={!willAvailable || !!overlay || !!stateRef.current.projectile}
+            aria-label={
+              willAvailable
+                ? `Swap to ${getCharacterById(waitingCharacterId).name}`
+                : `${getCharacterById(waitingCharacterId).name} — pop ${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} more to unlock`
+            }
+            className={`absolute bottom-2 left-2 z-10 flex flex-col items-center rounded-2xl bg-white/70 p-1 shadow-md backdrop-blur transition-transform ${
+              willAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
+            }`}
+          >
+            <div className={willAvailable ? "" : "opacity-40 grayscale"}>
+              <Dusty
+                size={64}
+                mood="idle"
+                characterId={waitingCharacterId}
+                showBow={false}
+              />
+            </div>
+            <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
+              {willAvailable
+                ? `Tap ${getCharacterById(waitingCharacterId).name}`
+                : `${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} to go`}
+            </span>
+          </button>
+        )}
 
         {/* Current + next ball indicators next to Dusty. Tap the next ball to swap. */}
         <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2" style={{ marginLeft: 64 }}>
