@@ -22,3 +22,36 @@ export interface AbilityContext {
 export type AbilityFn = (context: AbilityContext) => void;
 
 export const abilityRegistry: Record<string, AbilityFn> = {};
+
+/**
+ * Projectile-behavior registry — describes how a fired bubble should travel
+ * when the active character has a projectile ability. Kept separate from
+ * `abilityRegistry` because projectile behaviors are pure data the engine
+ * reads at fire-time (movement spec + landing rule), not per-frame mutators.
+ */
+export interface ProjectileBehavior {
+  kind: "zigzag-explode";
+  /** Number of grid rows the projectile travels before exploding. */
+  rowsBeforeExplode: number;
+  /** Radius (in bubble diameters) of the terminal explosion. */
+  explosionRadius: number;
+}
+
+export const projectileBehaviorRegistry: Record<string, ProjectileBehavior> = {
+  "zigzag-zapper": {
+    kind: "zigzag-explode",
+    rowsBeforeExplode: 8,
+    explosionRadius: 1,
+  },
+};
+
+/** Look up the first projectile behavior for a character's abilities, if any. */
+export function getProjectileBehaviorForAbilities(
+  abilityIds: readonly string[],
+): ProjectileBehavior | null {
+  for (const id of abilityIds) {
+    const b = projectileBehaviorRegistry[id];
+    if (b) return b;
+  }
+  return null;
+}
