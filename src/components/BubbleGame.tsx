@@ -261,11 +261,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           p.vx = Math.sin(ang) * speed * z.dir;
           p.vy = -Math.cos(ang) * speed;
         }
-        // Terminate after travelling rowsBeforeExplode rows OR on hitting
-        // the ceiling, whichever comes first.
+        // Will's bubble always travels all the way to the ceiling. The
+        // ability's `rowsBeforeExplode` value governs how far the terminal
+        // explosion reaches (see `detonateZigzag`), not the flight length.
         const reachedTop = p.y <= grid.radius + 8;
-        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
-          if (reachedTop) p.y = grid.radius + 8;
+        if (reachedTop) {
+          p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
         }
