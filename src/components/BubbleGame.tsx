@@ -985,7 +985,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       </div>
 
       {overlay === "win" && (
-        level.id === 60 ? (
+        companion && companion.availability && level.id === companion.availability.levels.to ? (
+          <FarewellScreen character={companion} onContinue={onNext} />
+        ) : level.id === 60 ? (
           <Overlay
             title="💖 Dusty found Matilda!"
             subtitle={`Reunited at last! Final score: ${score}`}
