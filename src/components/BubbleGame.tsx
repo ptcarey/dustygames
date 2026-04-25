@@ -34,6 +34,8 @@ const SHOOT_SPEED = 900; // px/sec
 const WILL_LEVELS: ReadonlySet<number> = new Set([5, 6, 7, 8, 9, 10]);
 /** Pops or drops Dusty must produce before Will becomes selectable. */
 const WILL_UNLOCK_THRESHOLD = 3;
+/** Pops Dusty must produce after a Will use before Will reactivates. */
+const WILL_REACTIVATE_THRESHOLD = 10;
 
 export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,10 +97,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   // Will is shown on screen but dimmed/inactive.
   const willOnThisLevel = WILL_LEVELS.has(level.id);
   const [popOrDropCount, setPopOrDropCount] = useState(0);
-  // Will may only fire once per level on his eligible levels (5–10). After
-  // his shot lands, the active thrower flips back to Dusty and Will becomes
-  // un-selectable for the rest of the level.
-  const [willUsedThisLevel, setWillUsedThisLevel] = useState(false);
+  // Cooldown baseline: when Will fires, we record the current pop count.
+  // Will reactivates once `popOrDropCount` has grown by
+  // WILL_REACTIVATE_THRESHOLD beyond that baseline. Null = Will has not yet
+  // been used this level (initial unlock uses WILL_UNLOCK_THRESHOLD).
+  const [willCooldownBaseline, setWillCooldownBaseline] = useState<number | null>(null);
   const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
     // Reset to Dusty whenever the player enters a level — Will must be
     // re-unlocked each level.
@@ -106,7 +109,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     return "dusty";
   });
   const willAvailable =
-    willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD && !willUsedThisLevel;
+    willOnThisLevel &&
+    (willCooldownBaseline === null
+      ? popOrDropCount >= WILL_UNLOCK_THRESHOLD
+      : popOrDropCount - willCooldownBaseline >= WILL_REACTIVATE_THRESHOLD);
   const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
   const activeCharacter = getCharacterById(activeThrowerId);
   const projectileBehavior = useMemo(
@@ -169,7 +175,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     // Reset Will-related state — pop counter resets per level, and the
     // active thrower returns to Dusty so Will must be re-earned.
     setPopOrDropCount(0);
-    setWillUsedThisLevel(false);
+    setWillCooldownBaseline(null);
     setActiveCharacterId("dusty");
     setActiveThrowerIdState("dusty");
   }, [level]);
@@ -261,11 +267,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           p.vx = Math.sin(ang) * speed * z.dir;
           p.vy = -Math.cos(ang) * speed;
         }
-        // Terminate after travelling rowsBeforeExplode rows OR on hitting
-        // the ceiling, whichever comes first.
+        // Will's bubble always travels all the way to the ceiling. The
+        // ability's `rowsBeforeExplode` value governs how far the terminal
+        // explosion reaches (see `detonateZigzag`), not the flight length.
         const reachedTop = p.y <= grid.radius + 8;
-        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
-          if (reachedTop) p.y = grid.radius + 8;
+        if (reachedTop) {
+          p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
         }
@@ -797,7 +804,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       // immediately and flip the active thrower back to Dusty so the next
       // shot uses Dusty's normal projectile.
       if (willOnThisLevel && activeThrowerId === "will") {
-        setWillUsedThisLevel(true);
+        // Start the reactivation cooldown — Will returns once Dusty pops
+        // WILL_REACTIVATE_THRESHOLD more bubbles after this point.
+        setWillCooldownBaseline(popOrDropCount);
         setActiveCharacterId("dusty");
         setActiveThrowerIdState("dusty");
       }
@@ -849,11 +858,13 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             onClick={(e) => { e.stopPropagation(); swapThrower(); }}
             onPointerDown={(e) => e.stopPropagation()}
             disabled={!willAvailable || !!overlay || !!stateRef.current.projectile}
-            aria-label={
-              willAvailable
-                ? `Swap to ${getCharacterById(waitingCharacterId).name}`
-                : `${getCharacterById(waitingCharacterId).name} — pop ${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} more to unlock`
-            }
+            aria-label={(() => {
+              if (willAvailable) return `Swap to ${getCharacterById(waitingCharacterId).name}`;
+              const remaining = willCooldownBaseline === null
+                ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
+                : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline));
+              return `${getCharacterById(waitingCharacterId).name} — pop ${remaining} more to unlock`;
+            })()}
             className={`absolute bottom-2 left-2 z-10 flex flex-col items-center rounded-2xl bg-white/70 p-1 shadow-md backdrop-blur transition-transform ${
               willAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
             }`}
@@ -869,7 +880,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
               {willAvailable
                 ? `Tap ${getCharacterById(waitingCharacterId).name}`
-                : `${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} to go`}
+                : `${
+                    willCooldownBaseline === null
+                      ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
+                      : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline))
+                  } to go`}
             </span>
           </button>
         )}
