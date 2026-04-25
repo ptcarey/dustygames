@@ -95,13 +95,18 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   // Will is shown on screen but dimmed/inactive.
   const willOnThisLevel = WILL_LEVELS.has(level.id);
   const [popOrDropCount, setPopOrDropCount] = useState(0);
+  // Will may only fire once per level on his eligible levels (5–10). After
+  // his shot lands, the active thrower flips back to Dusty and Will becomes
+  // un-selectable for the rest of the level.
+  const [willUsedThisLevel, setWillUsedThisLevel] = useState(false);
   const [activeThrowerId, setActiveThrowerIdState] = useState<string>(() => {
     // Reset to Dusty whenever the player enters a level — Will must be
     // re-unlocked each level.
     setActiveCharacterId("dusty");
     return "dusty";
   });
-  const willAvailable = willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD;
+  const willAvailable =
+    willOnThisLevel && popOrDropCount >= WILL_UNLOCK_THRESHOLD && !willUsedThisLevel;
   const waitingCharacterId = activeThrowerId === "dusty" ? "will" : "dusty";
   const activeCharacter = getCharacterById(activeThrowerId);
   const projectileBehavior = useMemo(
@@ -110,14 +115,18 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   );
 
   const swapThrower = useCallback(() => {
-    if (!willAvailable) return;
+    // Allow swapping in either direction while Will is available. Swapping
+    // away from Will (back to Dusty) is always allowed, even after Will is
+    // used, so the player isn't trapped on the Will sprite.
+    if (!willOnThisLevel) return;
     const s = stateRef.current;
     if (s.projectile) return; // can't swap mid-shot
     const nextId = activeThrowerId === "dusty" ? "will" : "dusty";
+    if (nextId === "will" && !willAvailable) return;
     setActiveCharacterId(nextId);
     setActiveThrowerIdState(nextId);
     Sfx.click();
-  }, [activeThrowerId, willAvailable]);
+  }, [activeThrowerId, willAvailable, willOnThisLevel]);
 
   const onWinRef = useRef(onWin);
   const onLoseRef = useRef(onLose);
@@ -160,6 +169,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     // Reset Will-related state — pop counter resets per level, and the
     // active thrower returns to Dusty so Will must be re-earned.
     setPopOrDropCount(0);
+    setWillUsedThisLevel(false);
     setActiveCharacterId("dusty");
     setActiveThrowerIdState("dusty");
   }, [level]);
@@ -251,13 +261,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           p.vx = Math.sin(ang) * speed * z.dir;
           p.vy = -Math.cos(ang) * speed;
         }
-        // Keep zig-zagging upward until the projectile reaches the top of
-        // the playfield. The 8-row spec from the original brief produced a
-        // mid-air vanish in tall/empty levels; the projectile now always
-        // travels the full way up before the terminal explosion.
+        // Terminate after travelling rowsBeforeExplode rows OR on hitting
+        // the ceiling, whichever comes first.
         const reachedTop = p.y <= grid.radius + 8;
-        if (reachedTop) {
-          p.y = grid.radius + 8;
+        if (z.rowsTravelled >= z.behavior.rowsBeforeExplode || reachedTop) {
+          if (reachedTop) p.y = grid.radius + 8;
           detonateZigzag(p, z);
           s.projectile = null;
         }
@@ -763,25 +771,36 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     vy = (vy / mag) * SHOOT_SPEED;
     if (projectileBehavior && projectileBehavior.kind === "zigzag-explode") {
       const grid = s.grid!;
-      // Start the zigzag straight up; the first row crossing flips the
-      // diagonal in `dir`. Begin with dir = -1 so the first leg goes left.
+      // Player-directed: take the first leg in the aimed horizontal
+      // direction (left if vx < 0, otherwise right). The bubble still
+      // travels predominantly upward but zig-zags around the aimed line.
       const speed = SHOOT_SPEED;
+      const initialDir: 1 | -1 = vx < 0 ? -1 : 1;
+      const ang = Math.PI * 0.32;
       s.projectile = {
         x: s.shooterX,
         y: s.shooterY,
-        vx: 0,
-        vy: -speed,
+        vx: Math.sin(ang) * speed * initialDir,
+        vy: -Math.cos(ang) * speed,
         color: s.currentColor,
         zigzag: {
           behavior: projectileBehavior,
           startY: s.shooterY,
           rowsTravelled: 0,
           nextRowY: s.shooterY - grid.rowHeight,
-          dir: -1,
+          dir: initialDir,
           poppedIds: new Set<number>(),
           baseSpeed: speed,
         },
       };
+      // Will fires once per level on his eligible levels — mark him used
+      // immediately and flip the active thrower back to Dusty so the next
+      // shot uses Dusty's normal projectile.
+      if (willOnThisLevel && activeThrowerId === "will") {
+        setWillUsedThisLevel(true);
+        setActiveCharacterId("dusty");
+        setActiveThrowerIdState("dusty");
+      }
     } else {
       s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
     }
