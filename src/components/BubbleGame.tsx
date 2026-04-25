@@ -804,7 +804,9 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       // immediately and flip the active thrower back to Dusty so the next
       // shot uses Dusty's normal projectile.
       if (willOnThisLevel && activeThrowerId === "will") {
-        setWillUsedThisLevel(true);
+        // Start the reactivation cooldown — Will returns once Dusty pops
+        // WILL_REACTIVATE_THRESHOLD more bubbles after this point.
+        setWillCooldownBaseline(popOrDropCount);
         setActiveCharacterId("dusty");
         setActiveThrowerIdState("dusty");
       }
