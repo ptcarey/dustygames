@@ -64,4 +64,15 @@ export interface Character {
   abilityIds: string[];
   voiceLines?: string[];
   backstory?: string;
+  cosmetics: string[];                  // ids of visual flourishes ("bowtie", "hat", "cape", etc.)
+  availability?: CharacterAvailability; // optional — characters without a rule are always available on all levels
+}
+
+export interface CharacterAvailability {
+  /** Inclusive level-id range during which this character can appear. */
+  levels: { from: number; to: number };
+  /** What the player must do before this character first becomes selectable on a level. */
+  initialUnlock: { metric: "popOrDropInLevel"; count: number };
+  /** After this character is used, what the player must do for them to become selectable again on the same level. */
+  reactivation: { metric: "popOrDropInLevel"; count: number };
 }
