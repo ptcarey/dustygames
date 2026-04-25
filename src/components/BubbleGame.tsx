@@ -858,11 +858,13 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             onClick={(e) => { e.stopPropagation(); swapThrower(); }}
             onPointerDown={(e) => e.stopPropagation()}
             disabled={!willAvailable || !!overlay || !!stateRef.current.projectile}
-            aria-label={
-              willAvailable
-                ? `Swap to ${getCharacterById(waitingCharacterId).name}`
-                : `${getCharacterById(waitingCharacterId).name} — pop ${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} more to unlock`
-            }
+            aria-label={(() => {
+              if (willAvailable) return `Swap to ${getCharacterById(waitingCharacterId).name}`;
+              const remaining = willCooldownBaseline === null
+                ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
+                : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline));
+              return `${getCharacterById(waitingCharacterId).name} — pop ${remaining} more to unlock`;
+            })()}
             className={`absolute bottom-2 left-2 z-10 flex flex-col items-center rounded-2xl bg-white/70 p-1 shadow-md backdrop-blur transition-transform ${
               willAvailable ? "hover:scale-105 active:scale-95" : "cursor-not-allowed"
             }`}
@@ -878,7 +880,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
               {willAvailable
                 ? `Tap ${getCharacterById(waitingCharacterId).name}`
-                : `${Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)} to go`}
+                : `${
+                    willCooldownBaseline === null
+                      ? Math.max(0, WILL_UNLOCK_THRESHOLD - popOrDropCount)
+                      : Math.max(0, WILL_REACTIVATE_THRESHOLD - (popOrDropCount - willCooldownBaseline))
+                  } to go`}
             </span>
           </button>
         )}
