@@ -963,6 +963,21 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         setActiveCharacterId("dusty");
         setActiveThrowerIdState("dusty");
       }
+    } else if (projectileBehavior && projectileBehavior.kind === "love-bomb") {
+      // Bella's Love Bomb — flies straight along the player's aim and
+      // explodes on first contact with any bubble or the ceiling.
+      s.projectile = {
+        x: s.shooterX,
+        y: s.shooterY,
+        vx, vy,
+        color: s.currentColor,
+        loveBomb: { behavior: projectileBehavior },
+      };
+      if (companionOnThisLevel && activeThrowerId === companionId) {
+        setCompanionCooldownBaseline(popOrDropCount);
+        setActiveCharacterId("dusty");
+        setActiveThrowerIdState("dusty");
+      }
     } else {
       s.projectile = { x: s.shooterX, y: s.shooterY, vx, vy, color: s.currentColor };
     }
