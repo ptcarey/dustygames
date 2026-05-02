@@ -59,6 +59,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         aimFromVertical: number; // player's aim angle (0 = straight up, neg = left)
         wobble: number;          // zigzag amplitude added/subtracted from aim
       };
+      // Optional love-bomb flight (Bella's Love Bomb ability) — straight
+      // line along the player's aim, heart-rendered, explodes on first
+      // contact with any bubble or the ceiling regardless of color.
+      loveBomb?: {
+        behavior: Extract<ProjectileBehavior, { kind: "love-bomb" }>;
+      };
     } | null;
     aiming: boolean;
     aimAngle: number;
@@ -293,7 +299,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
         }
         if (hit) {
-          landProjectile(p);
+          if (p.loveBomb) {
+            detonateLoveBomb(p, p.loveBomb.behavior);
+          } else {
+            landProjectile(p);
+          }
           s.projectile = null;
         }
       }
@@ -467,6 +477,90 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     // Will's pops + drops also count toward Dusty's unlock counter — but
     // since Will only fires once already unlocked, the counter is only
     // gameplay-relevant while Dusty is active.
+    setPopOrDropCount(c => c + popped.length + floaters.length);
+    tickAfterShot(true);
+  };
+
+  /**
+   * Bella's Love Bomb terminal explosion. Pops every bubble within
+   * `explosionRadius` diameters of the impact point regardless of color,
+   * then runs the standard floater pass and ticks the shot counter.
+   */
+  const detonateLoveBomb = (
+    p: { x: number; y: number; color: BubbleColor },
+    behavior: Extract<ProjectileBehavior, { kind: "love-bomb" }>,
+  ) => {
+    const s = stateRef.current;
+    const grid = s.grid!;
+
+    // Pink burst at the detonation point so the explosion reads even when
+    // the heart lands in empty space.
+    const burstPieces = 18;
+    for (let k = 0; k < burstPieces; k++) {
+      const ang = (Math.PI * 2 * k) / burstPieces + Math.random() * 0.3;
+      const speed = 200 + Math.random() * 220;
+      s.particles.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed - 80,
+        color: "pink",
+        born: performance.now(),
+        life: 700 + Math.random() * 240,
+        size: 4 + Math.random() * 3,
+      });
+    }
+    Sfx.pop(0);
+
+    const radiusPx = behavior.explosionRadius * grid.diameter + grid.radius * 0.5;
+    const idsToPop = new Set<number>();
+    for (const b of grid.bubbles) {
+      const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+      if (dx * dx + dy * dy <= radiusPx * radiusPx) idsToPop.add(b.id);
+    }
+    const popped = grid.bubbles.filter(b => idsToPop.has(b.id));
+    if (popped.length === 0) {
+      tickAfterShot(false);
+      return;
+    }
+    grid.bubbles = grid.bubbles.filter(b => !idsToPop.has(b.id));
+
+    let chainTotal = 0;
+    popped.forEach((b, i) => {
+      chainTotal += (i + 1) * 10;
+      const px = b.x, py = b.y + s.scrollY;
+      s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
+      const pieces = 8;
+      for (let k = 0; k < pieces; k++) {
+        const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
+        const speed = 140 + Math.random() * 180;
+        s.particles.push({
+          x: px, y: py,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 60,
+          color: b.color,
+          born: performance.now() + i * 30,
+          life: 600 + Math.random() * 200,
+          size: 3 + Math.random() * 3,
+        });
+      }
+      setTimeout(() => Sfx.pop(i), i * 40);
+      if (b.hasPossum) {
+        s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
+        setPossumsLeft(pl => Math.max(0, pl - 1));
+        setTimeout(() => Sfx.squeak(), i * 40 + 60);
+      }
+    });
+    setScore(sc => sc + chainTotal);
+    flashHappy();
+
+    const floaters = findFloaters(grid);
+    if (floaters.length) {
+      const fIds = new Set(floaters.map(b => b.id));
+      grid.bubbles = grid.bubbles.filter(b => !fIds.has(b.id));
+      floaters.forEach(b => s.falling.push({ ...b, y: b.y + s.scrollY, vy: 0 }));
+      setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (popped.length + i + 1) * 10, 0));
+    }
+
     setPopOrDropCount(c => c + popped.length + floaters.length);
     tickAfterShot(true);
   };
@@ -656,8 +750,48 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
 
     if (s.projectile) {
-      drawBubble(ctx, s.projectile.x, s.projectile.y, s.projectile.color, false);
+      if (s.projectile.loveBomb) {
+        drawHeart(ctx, s.projectile.x, s.projectile.y, s.grid!.diameter);
+      } else {
+        drawBubble(ctx, s.projectile.x, s.projectile.y, s.projectile.color, false);
+      }
     }
+  };
+
+  /**
+   * Heart-shaped projectile for Bella's Love Bomb. Sized to fit a single
+   * grid bubble (`diameter`) so it reads as "one ball" but visually
+   * distinct from regular shots.
+   */
+  const drawHeart = (
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number, diameter: number,
+  ) => {
+    const size = diameter; // bounding box matches one bubble
+    ctx.save();
+    ctx.translate(x, y);
+    // Heart path inscribed in a `size`-tall bounding box, vertically centred.
+    const w = size, h = size;
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.30);
+    ctx.bezierCurveTo(w * 0.55, -h * 0.20,  w * 0.65, h * 0.25,  0, h * 0.50);
+    ctx.bezierCurveTo(-w * 0.65, h * 0.25, -w * 0.55, -h * 0.20, 0, h * 0.30);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(-w * 0.18, -h * 0.05, w * 0.05, 0, h * 0.1, w * 0.6);
+    grad.addColorStop(0, "hsl(340, 100%, 92%)");
+    grad.addColorStop(0.5, "hsl(340, 90%, 65%)");
+    grad.addColorStop(1, "hsl(345, 80%, 50%)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "hsl(345, 70%, 35%)";
+    ctx.stroke();
+    // Sparkle highlight
+    ctx.beginPath();
+    ctx.ellipse(-w * 0.20, -h * 0.02, w * 0.10, h * 0.06, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fill();
+    ctx.restore();
   };
 
   const drawBubble = (
@@ -824,6 +958,21 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       // Companion fires — start the reactivation cooldown and flip the
       // active thrower back to Dusty so the next shot uses Dusty's normal
       // projectile.
+      if (companionOnThisLevel && activeThrowerId === companionId) {
+        setCompanionCooldownBaseline(popOrDropCount);
+        setActiveCharacterId("dusty");
+        setActiveThrowerIdState("dusty");
+      }
+    } else if (projectileBehavior && projectileBehavior.kind === "love-bomb") {
+      // Bella's Love Bomb — flies straight along the player's aim and
+      // explodes on first contact with any bubble or the ceiling.
+      s.projectile = {
+        x: s.shooterX,
+        y: s.shooterY,
+        vx, vy,
+        color: s.currentColor,
+        loveBomb: { behavior: projectileBehavior },
+      };
       if (companionOnThisLevel && activeThrowerId === companionId) {
         setCompanionCooldownBaseline(popOrDropCount);
         setActiveCharacterId("dusty");
