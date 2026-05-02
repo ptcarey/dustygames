@@ -750,7 +750,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
 
     if (s.projectile) {
-      drawBubble(ctx, s.projectile.x, s.projectile.y, s.projectile.color, false);
+      if (s.projectile.loveBomb) {
+        drawHeart(ctx, s.projectile.x, s.projectile.y, s.grid!.diameter);
+      } else {
+        drawBubble(ctx, s.projectile.x, s.projectile.y, s.projectile.color, false);
+      }
     }
   };
 
