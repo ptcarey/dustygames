@@ -767,28 +767,56 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     ctx: CanvasRenderingContext2D,
     x: number, y: number, diameter: number,
   ) => {
-    const size = diameter; // bounding box matches one bubble
+    // Round, bubbly heart built from two circular lobes + a soft V tail.
+    // Sized to fit within a single bubble's bounding box.
+    const r = diameter * 0.5;          // overall bounding radius
+    const lobeR = r * 0.55;            // each top lobe is a fat circle
+    const lobeOffsetX = r * 0.42;      // horizontal lobe spacing
+    const lobeOffsetY = -r * 0.18;     // lift the lobes above centre
+    const tailY = r * 0.78;            // bottom tip of the heart
     ctx.save();
     ctx.translate(x, y);
-    // Heart path inscribed in a `size`-tall bounding box, vertically centred.
-    const w = size, h = size;
     ctx.beginPath();
-    ctx.moveTo(0, h * 0.30);
-    ctx.bezierCurveTo(w * 0.55, -h * 0.20,  w * 0.65, h * 0.25,  0, h * 0.50);
-    ctx.bezierCurveTo(-w * 0.65, h * 0.25, -w * 0.55, -h * 0.20, 0, h * 0.30);
+    // Start at right side where right lobe meets the descending curve.
+    ctx.moveTo(lobeOffsetX + lobeR, lobeOffsetY);
+    // Right lobe — full circle arc across the top.
+    ctx.arc(lobeOffsetX, lobeOffsetY, lobeR, 0, Math.PI, true);
+    // Soft dip between the lobes (slightly raised so the lobes read as
+    // two plump bubbles rather than a single blob).
+    ctx.quadraticCurveTo(0, lobeOffsetY + lobeR * 0.35, -lobeOffsetX - lobeR, lobeOffsetY);
+    // Left lobe.
+    ctx.arc(-lobeOffsetX, lobeOffsetY, lobeR, Math.PI, 0, true);
+    // Right side curving down to the tail tip — bulges outward for that
+    // bubbly silhouette before tapering to a soft point.
+    ctx.bezierCurveTo(
+      lobeOffsetX + lobeR * 1.05, lobeOffsetY + lobeR * 0.9,
+      r * 0.55,                   tailY * 0.55,
+      0,                          tailY,
+    );
+    // Left side mirror back up to the starting lobe.
+    ctx.bezierCurveTo(
+      -r * 0.55,                   tailY * 0.55,
+      -lobeOffsetX - lobeR * 1.05, lobeOffsetY + lobeR * 0.9,
+      -lobeOffsetX - lobeR,        lobeOffsetY,
+    );
     ctx.closePath();
-    const grad = ctx.createRadialGradient(-w * 0.18, -h * 0.05, w * 0.05, 0, h * 0.1, w * 0.6);
-    grad.addColorStop(0, "hsl(340, 100%, 92%)");
-    grad.addColorStop(0.5, "hsl(340, 90%, 65%)");
-    grad.addColorStop(1, "hsl(345, 80%, 50%)");
+    // Glossy bubble-style fill.
+    const grad = ctx.createRadialGradient(
+      -r * 0.25, -r * 0.30, r * 0.05,
+      0,         r * 0.10,  r * 0.95,
+    );
+    grad.addColorStop(0,    "hsl(340, 100%, 95%)");
+    grad.addColorStop(0.45, "hsl(340, 90%, 68%)");
+    grad.addColorStop(1,    "hsl(345, 80%, 48%)");
     ctx.fillStyle = grad;
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = "hsl(345, 70%, 35%)";
     ctx.stroke();
-    // Sparkle highlight
+    // Sparkle highlight on the left lobe.
     ctx.beginPath();
-    ctx.ellipse(-w * 0.20, -h * 0.02, w * 0.10, h * 0.06, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(-lobeOffsetX * 0.85, lobeOffsetY - lobeR * 0.25,
+                lobeR * 0.32, lobeR * 0.18, -0.5, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.fill();
     ctx.restore();
