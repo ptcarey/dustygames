@@ -43,7 +43,7 @@ export const projectileBehaviorRegistry: Record<string, ProjectileBehavior> = {
   },
   "love-bomb": {
     kind: "love-bomb",
-    explosionRadius: 2,
+    explosionRadius: 1,
     ignoresColorMatch: true,
   },
   "triple-guard": {
