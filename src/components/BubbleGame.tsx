@@ -481,6 +481,90 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     tickAfterShot(true);
   };
 
+  /**
+   * Bella's Love Bomb terminal explosion. Pops every bubble within
+   * `explosionRadius` diameters of the impact point regardless of color,
+   * then runs the standard floater pass and ticks the shot counter.
+   */
+  const detonateLoveBomb = (
+    p: { x: number; y: number; color: BubbleColor },
+    behavior: Extract<ProjectileBehavior, { kind: "love-bomb" }>,
+  ) => {
+    const s = stateRef.current;
+    const grid = s.grid!;
+
+    // Pink burst at the detonation point so the explosion reads even when
+    // the heart lands in empty space.
+    const burstPieces = 18;
+    for (let k = 0; k < burstPieces; k++) {
+      const ang = (Math.PI * 2 * k) / burstPieces + Math.random() * 0.3;
+      const speed = 200 + Math.random() * 220;
+      s.particles.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed - 80,
+        color: "pink",
+        born: performance.now(),
+        life: 700 + Math.random() * 240,
+        size: 4 + Math.random() * 3,
+      });
+    }
+    Sfx.pop(0);
+
+    const radiusPx = behavior.explosionRadius * grid.diameter + grid.radius * 0.5;
+    const idsToPop = new Set<number>();
+    for (const b of grid.bubbles) {
+      const dx = b.x - p.x, dy = (b.y + s.scrollY) - p.y;
+      if (dx * dx + dy * dy <= radiusPx * radiusPx) idsToPop.add(b.id);
+    }
+    const popped = grid.bubbles.filter(b => idsToPop.has(b.id));
+    if (popped.length === 0) {
+      tickAfterShot(false);
+      return;
+    }
+    grid.bubbles = grid.bubbles.filter(b => !idsToPop.has(b.id));
+
+    let chainTotal = 0;
+    popped.forEach((b, i) => {
+      chainTotal += (i + 1) * 10;
+      const px = b.x, py = b.y + s.scrollY;
+      s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
+      const pieces = 8;
+      for (let k = 0; k < pieces; k++) {
+        const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
+        const speed = 140 + Math.random() * 180;
+        s.particles.push({
+          x: px, y: py,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 60,
+          color: b.color,
+          born: performance.now() + i * 30,
+          life: 600 + Math.random() * 200,
+          size: 3 + Math.random() * 3,
+        });
+      }
+      setTimeout(() => Sfx.pop(i), i * 40);
+      if (b.hasPossum) {
+        s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
+        setPossumsLeft(pl => Math.max(0, pl - 1));
+        setTimeout(() => Sfx.squeak(), i * 40 + 60);
+      }
+    });
+    setScore(sc => sc + chainTotal);
+    flashHappy();
+
+    const floaters = findFloaters(grid);
+    if (floaters.length) {
+      const fIds = new Set(floaters.map(b => b.id));
+      grid.bubbles = grid.bubbles.filter(b => !fIds.has(b.id));
+      floaters.forEach(b => s.falling.push({ ...b, y: b.y + s.scrollY, vy: 0 }));
+      setScore(sc => sc + floaters.reduce((acc, _, i) => acc + (popped.length + i + 1) * 10, 0));
+    }
+
+    setPopOrDropCount(c => c + popped.length + floaters.length);
+    tickAfterShot(true);
+  };
+
   const processChain = (cluster: Bubble[]) => {
     const s = stateRef.current;
     const grid = s.grid!;
