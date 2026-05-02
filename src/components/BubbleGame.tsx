@@ -59,6 +59,12 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         aimFromVertical: number; // player's aim angle (0 = straight up, neg = left)
         wobble: number;          // zigzag amplitude added/subtracted from aim
       };
+      // Optional love-bomb flight (Bella's Love Bomb ability) — straight
+      // line along the player's aim, heart-rendered, explodes on first
+      // contact with any bubble or the ceiling regardless of color.
+      loveBomb?: {
+        behavior: Extract<ProjectileBehavior, { kind: "love-bomb" }>;
+      };
     } | null;
     aiming: boolean;
     aimAngle: number;
