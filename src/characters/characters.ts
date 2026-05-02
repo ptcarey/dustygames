@@ -23,7 +23,7 @@ export const CHARACTERS: readonly Character[] = [
   },
   {
     id: "will",
-    name: "Will",
+    name: "Teddy",
     // Cheeky black toy poodle — themed against the existing accent token so
     // it stays consistent with the design system (HSL via CSS var).
     themeColor: "hsl(var(--accent))",
@@ -55,12 +55,12 @@ export const CHARACTERS: readonly Character[] = [
   },
   {
     id: "teddy",
-    name: "Teddy",
+    name: "Will",
     themeColor: "hsl(30, 60%, 40%)",
     spriteRef: teddySprite,
     abilityIds: ["triple-guard"],
     voiceLines: [],
-    backstory: "A serious 14-year-old German Shepherd who fires three orbiting bubbles at once.",
+    backstory: "A serious 14-year-old German Shepherd named Will who fires three orbiting bubbles at once.",
     cosmetics: [],
     availability: {
       levels: { from: 31, to: 40 },
