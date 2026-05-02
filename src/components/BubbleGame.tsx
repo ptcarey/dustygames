@@ -758,6 +758,42 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     }
   };
 
+  /**
+   * Heart-shaped projectile for Bella's Love Bomb. Sized to fit a single
+   * grid bubble (`diameter`) so it reads as "one ball" but visually
+   * distinct from regular shots.
+   */
+  const drawHeart = (
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number, diameter: number,
+  ) => {
+    const size = diameter; // bounding box matches one bubble
+    ctx.save();
+    ctx.translate(x, y);
+    // Heart path inscribed in a `size`-tall bounding box, vertically centred.
+    const w = size, h = size;
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.30);
+    ctx.bezierCurveTo(w * 0.55, -h * 0.20,  w * 0.65, h * 0.25,  0, h * 0.50);
+    ctx.bezierCurveTo(-w * 0.65, h * 0.25, -w * 0.55, -h * 0.20, 0, h * 0.30);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(-w * 0.18, -h * 0.05, w * 0.05, 0, h * 0.1, w * 0.6);
+    grad.addColorStop(0, "hsl(340, 100%, 92%)");
+    grad.addColorStop(0.5, "hsl(340, 90%, 65%)");
+    grad.addColorStop(1, "hsl(345, 80%, 50%)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "hsl(345, 70%, 35%)";
+    ctx.stroke();
+    // Sparkle highlight
+    ctx.beginPath();
+    ctx.ellipse(-w * 0.20, -h * 0.02, w * 0.10, h * 0.06, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fill();
+    ctx.restore();
+  };
+
   const drawBubble = (
     ctx: CanvasRenderingContext2D,
     x: number, y: number, color: BubbleColor, possum: boolean, scale = 1,
