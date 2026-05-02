@@ -299,7 +299,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           if (dx * dx + dy * dy < (grid.diameter * 0.92) ** 2) { hit = true; break; }
         }
         if (hit) {
-          landProjectile(p);
+          if (p.loveBomb) {
+            detonateLoveBomb(p, p.loveBomb.behavior);
+          } else {
+            landProjectile(p);
+          }
           s.projectile = null;
         }
       }
