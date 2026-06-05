@@ -47,6 +47,20 @@ export interface GameSave {
   highScore: number;
   audioEnabled: boolean;
   lastPlayedLevel: number; // most recently entered level (for map auto-scroll)
+  /** Star ratings per level: { [levelId]: 1|2|3 } */
+  stars?: Record<number, number>;
+  /** Total possums rescued across all levels */
+  totalPossumsRescued?: number;
+  /** Achievement IDs that have been earned */
+  achievements?: string[];
+  /** Best (lowest) shots used per level */
+  bestShots?: Record<number, number>;
+  /** Hints remaining (replenishes daily) */
+  hintsRemaining?: number;
+  /** ISO date string of last hint refill */
+  lastHintRefill?: string;
+  /** Colorblind mode enabled */
+  colorblindMode?: boolean;
 }
 
 /**

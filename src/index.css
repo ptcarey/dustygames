@@ -130,6 +130,13 @@
   .animate-bounce-soft { animation: bounce-soft 0.5s var(--bounce); }
   .animate-float { animation: float 3s ease-in-out infinite; }
   .animate-pop { animation: pop 0.4s var(--bounce) forwards; }
+  .animate-idle-breathe { animation: idle-breathe 3s ease-in-out infinite; }
+  .animate-parallax-drift { animation: parallax-drift 12s ease-in-out infinite; }
+}
+
+@media (pointer: coarse) {
+  .kid-button, .kid-button-secondary { min-height: 52px; font-size: 1.15rem; }
+  button[aria-label] { min-width: 44px; min-height: 44px; }
 }
 
 @keyframes wiggle {
@@ -154,4 +161,13 @@
   0% { transform: scale(1); opacity: 1; }
   60% { transform: scale(1.4); opacity: 0.7; }
   100% { transform: scale(0); opacity: 0; }
+}
+@keyframes idle-breathe {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50% { transform: scaleY(1.015) translateY(-1px); }
+}
+@keyframes parallax-drift {
+  0%, 100% { transform: translate(0, 0) scale(1.02); }
+  33% { transform: translate(2px, -3px) scale(1.02); }
+  66% { transform: translate(-2px, 2px) scale(1.02); }
 }

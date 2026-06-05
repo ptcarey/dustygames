@@ -2,6 +2,15 @@ import { COLOR_HSL, type BubbleColor } from "@/game/types";
 import { getActiveCharacterId } from "@/game/storage";
 import { getCharacterById } from "@/characters/characters";
 
+const SPRITE_META: Record<string, { aspect: number; bowY: number }> = {
+  dusty:  { aspect: 512 / 324, bowY: 0.42 },
+  will:   { aspect: 921 / 716, bowY: 0.36 },
+  bella:  { aspect: 921 / 716, bowY: 0.36 },
+  teddy:  { aspect: 921 / 716, bowY: 0.36 },
+  ruby:   { aspect: 921 / 716, bowY: 0.36 },
+};
+const DEFAULT_META = { aspect: 921 / 716, bowY: 0.36 };
+
 interface Props {
   size?: number;
   /** "idle" | "happy" | "wag" — drives subtle animations. */
@@ -20,7 +29,7 @@ interface Props {
  * with a small colored bowtie overlay matching the next bubble.
  */
 export function Dusty({ size = 140, mood = "idle", ballColor, className, characterId, showBow = true }: Props) {
-  const wrapAnim = mood === "happy" ? "animate-wiggle" : "";
+  const wrapAnim = mood === "happy" ? "animate-wiggle" : mood === "idle" ? "animate-idle-breathe" : "";
   const bowFill = ballColor ? COLOR_HSL[ballColor] : "hsl(var(--primary))";
   // Resolve sprite via the character lookup. With no override and active =
   // "dusty" this returns the same imported asset as before — behaviour
@@ -28,9 +37,9 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className, charact
   const resolvedId = characterId ?? getActiveCharacterId();
   const character = getCharacterById(resolvedId);
   const dustyImg = character.spriteRef;
-  // Image aspect ~422:677
+  const meta = SPRITE_META[resolvedId] ?? DEFAULT_META;
   const w = size;
-  const h = Math.round(size * (677 / 422));
+  const h = Math.round(size * meta.aspect);
   return (
     <div
       className={`relative inline-block ${wrapAnim} ${className ?? ""}`}
@@ -48,7 +57,7 @@ export function Dusty({ size = 140, mood = "idle", ballColor, className, charact
       {showBow && <svg
         viewBox="0 0 100 40"
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-        style={{ top: `${h * 0.42}px`, width: `${w * 0.55}px`, height: "auto" }}
+        style={{ top: `${h * meta.bowY}px`, width: `${w * 0.55}px`, height: "auto" }}
       >
         <path
           d="M10 6 L42 20 L10 34 Z"

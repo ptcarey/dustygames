@@ -30,61 +30,67 @@ const colorChar = (c: BubbleColor) => c[0];
  */
 const HANDCRAFTED_STAGE1: LevelConfig[] = [
   {
-    id: 1, name: STAGES[0].levelNames[0], shots: 14, cols: 15,
+    // Level 1: 2 colors, wide gaps, 1 possum right at the top. A 6-year-old
+    // can clear this in a few shots — pure colour-matching intro.
+    id: 1, name: STAGES[0].levelNames[0], shots: 18, cols: 15,
+    shooterColors: ["red", "blue"],
+    grid: [
+      "rr.bb.Rr.bb.rr.",
+      "bb.rr.bb.rr.bb.",
+      "rr.bb.rr.bb.rr.",
+      "..r..b..r..b...",
+    ],
+  },
+  {
+    // Level 2: 3 colors, generous gaps, 1 possum top-centre.
+    id: 2, name: STAGES[0].levelNames[1], shots: 18, cols: 15,
     shooterColors: ["red", "blue", "yellow"],
     grid: [
-      "rr.byyr.bby.rrb",
-      "by.rrb.yyr.bbyy",
-      "rby.ryyB.ybyrby",
-      "...rby...rby...",
+      "by.rr.Yy.bb.yr.",
+      "rr.yy.bb.rr.yy.",
+      "yy.bb.rr.yy.bb.",
+      "..b..r..y..b...",
+      ".....r...y.....",
     ],
   },
   {
-    id: 2, name: STAGES[0].levelNames[1], shots: 16, cols: 15,
+    // Level 3: 3 colors, 2 possums — one top, one in middle for early win.
+    id: 3, name: STAGES[0].levelNames[2], shots: 20, cols: 15,
+    shooterColors: ["blue", "green", "yellow"],
+    grid: [
+      "gg.Bb.yy.gg.bb.",
+      "bb.gg.bb.yy.gg.",
+      "yy.bb.Gg.bb.yy.",
+      "gg.yy.bb.gg.bb.",
+      "..g..b..y..g...",
+    ],
+  },
+  {
+    // Level 4: 4 colors, 2 possums — one top, one in lower half.
+    id: 4, name: STAGES[0].levelNames[3], shots: 22, cols: 15,
     shooterColors: ["red", "blue", "green", "yellow"],
     grid: [
-      "rg.ygrg.ygrg.yr",
-      "by.gby.rby.rb.g",
-      "gr.bGgr.byrg.yb",
-      "rb.yg.br.yg.rby",
-      "...g.b.r.y.....",
+      "rr.Gg.bb.yy.rr.",
+      "gg.bb.yy.rr.gg.",
+      "bb.yy.rr.gg.bb.",
+      "yy.rr.Gg.bb.yy.",
+      "rr.gg.bb.yy.rr.",
+      "..r..g..b..y...",
     ],
   },
   {
-    id: 3, name: STAGES[0].levelNames[2], shots: 18, cols: 15,
-    shooterColors: ["red", "blue", "green", "yellow", "purple"],
-    grid: [
-      "rk.ygk.bygk.byk",
-      "yg.bky.rbk.grbK",
-      "bR.gkb.ygk.bygk",
-      "gy.rkg.brkGybrk",
-      "..yk..rb..yg..k",
-    ],
-  },
-  {
-    id: 4, name: STAGES[0].levelNames[3], shots: 20, cols: 15,
-    shooterColors: BUBBLE_COLORS,
-    grid: [
-      "rb.ykp.bgyk.rbg",
-      "pk.gbrPky.brpky",
-      "gy.kprg.bkprgyb",
-      "rk.bygr.bygrk.P",
-      "by.gk.rp.bg.yk.",
-      "..r.b.g.y.k.p..",
-    ],
-  },
-  {
-    id: 5, name: STAGES[0].levelNames[4], shots: 22, cols: 15,
+    // Level 5: 4 colors + purple intro, 3 possums scattered — top, middle, low.
+    // End of tutorial.
+    id: 5, name: STAGES[0].levelNames[4], shots: 25, cols: 15,
     shooterColors: ["red", "blue", "yellow", "purple"],
     grid: [
-      "ppyyppRRppkkppy",
-      "ypprrppyypkkbby",
-      "yyppyypprrppkkb",
-      "ppKKppyybbppyyp",
-      "ppyypprrppyybbp",
-      "ypprrppyybbppy.",
-      "ppyybbppyyrrpp.",
-      "ppppppYYpppppp.",
+      "Rr.bb.pp.yy.rr.",
+      "bb.yy.rr.pp.bb.",
+      "pp.rr.Bb.yy.pp.",
+      "yy.pp.yy.rr.bb.",
+      "rr.bb.pp.Bb.yy.",
+      "pp.yy.rr.pp.rr.",
+      "..r..b..y..p...",
     ],
   },
 ];
@@ -108,7 +114,11 @@ function makeRng(seed: number): RNG {
 function fillTop(g: boolean[][], n = 3) {
   const limit = Math.min(n, g.length);
   for (let r = 0; r < limit; r++)
-    for (let c = 0; c < cols; c++) g[r][c] = true;
+    for (let c = 0; c < cols; c++) {
+      // Leave regular gaps so shots can squeeze through to reach the top.
+      if (r > 0 && c % 4 === 3) continue;
+      g[r][c] = true;
+    }
 }
 function warp(g: boolean[][], colsAt: number[]) {
   for (const c of colsAt)
@@ -152,15 +162,23 @@ const makeDiamonds = (rows: number): boolean[][] => {
       }
   warp(g, [0, 4, 8, 12, 14]); fillTop(g, 3); return g;
 };
-const makeWeave = (rows: number): boolean[][] => {
+const makeZigzag = (rows: number): boolean[][] => {
   const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-  for (let r = 0; r < rows; r += 3) for (let c = 0; c < cols; c++) g[r][c] = true;
-  warp(g, [0, 2, 4, 6, 8, 10, 12, 14]); fillTop(g, 3); return g;
+  const wave = 5;
+  for (let r = 0; r < rows; r++) {
+    const sweep = Math.sin(r * Math.PI / wave) * 4;
+    const center = Math.round((cols - 1) / 2 + sweep);
+    for (let dc = -3; dc <= 3; dc++) {
+      const c = center + dc;
+      if (c >= 0 && c < cols) g[r][c] = true;
+    }
+  }
+  fillTop(g, 3); return g;
 };
 const makeChevrons = (rows: number): boolean[][] => {
   const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
   const span = Math.floor(cols / 2);
-  for (let r0 = 0; r0 < rows; r0 += 3)
+  for (let r0 = 0; r0 < rows; r0 += 4)
     for (let k = 0; k <= span; k++) {
       const r = r0 + k; if (r >= rows) break;
       const left = span - k, right = span + k;
@@ -169,18 +187,46 @@ const makeChevrons = (rows: number): boolean[][] => {
     }
   warp(g, [0, 7, 14]); fillTop(g, 3); return g;
 };
-const makeStars = (rows: number): boolean[][] => {
+const makeScatter = (rows: number): boolean[][] => {
   const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const stamp = [".xxx.", "xxxxx", "xxxxx", "xxxxx", ".xxx."];
-  const sw = stamp[0].length, sh = stamp.length;
-  for (let r0 = 0; r0 < rows; r0 += sh)
-    for (let c0 = 0; c0 < cols; c0 += sw)
-      for (let r = 0; r < sh; r++) for (let c = 0; c < sw; c++)
-        if (stamp[r][c] === "x") {
-          const rr = r0 + r, cc = c0 + c;
-          if (rr < rows && cc < cols) g[rr][cc] = true;
-        }
-  warp(g, [0, 5, 10, 14]); fillTop(g, 3); return g;
+  const clumps = Math.max(5, Math.floor(rows * 1.2));
+  for (let i = 0; i < clumps; i++) {
+    const cr = Math.floor((i * 7 + 3) % rows);
+    const cc = Math.floor((i * 11 + 5) % cols);
+    const size = 1 + (i % 3);
+    for (let dr = -size; dr <= size; dr++)
+      for (let dc = -size; dc <= size; dc++) {
+        if (Math.abs(dr) + Math.abs(dc) > size + 1) continue;
+        const r = cr + dr, c = cc + dc;
+        if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = true;
+      }
+  }
+  fillTop(g, 3); return g;
+};
+const makeSpiral = (rows: number): boolean[][] => {
+  const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const cx = (cols - 1) / 2, cy = rows / 2;
+  for (let t = 0; t < 300; t++) {
+    const a = t * 0.12;
+    const radius = t * 0.065;
+    const r = Math.round(cy + Math.sin(a) * radius * 0.8);
+    const c = Math.round(cx + Math.cos(a) * radius);
+    if (r >= 0 && r < rows && c >= 0 && c < cols) {
+      g[r][c] = true;
+      if (c - 1 >= 0) g[r][c - 1] = true;
+      if (c + 1 < cols) g[r][c + 1] = true;
+    }
+  }
+  fillTop(g, 3); return g;
+};
+const makeLattice = (rows: number): boolean[][] => {
+  const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      if ((r + c) % 3 === 0) g[r][c] = true;
+      if (r % 4 === 0 && c % 2 === 0) g[r][c] = true;
+    }
+  fillTop(g, 3); return g;
 };
 const makeHoneycomb = (rows: number): boolean[][] => {
   const g: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(true));
@@ -188,9 +234,11 @@ const makeHoneycomb = (rows: number): boolean[][] => {
     const offset = (r / 3) % 2 === 0 ? 2 : 4;
     for (let c = offset; c < cols; c += 4) g[r][c] = false;
   }
+  for (let r = 3; r < rows; r += 4)
+    for (let c = 1; c < cols; c += 5) if (c < cols) g[r][c] = false;
   fillTop(g, 3); return g;
 };
-const PATTERNS = [makeWeb, makeDiamonds, makeWeave, makeChevrons, makeStars, makeHoneycomb];
+const PATTERNS = [makeWeb, makeDiamonds, makeZigzag, makeChevrons, makeScatter, makeSpiral, makeLattice, makeHoneycomb];
 
 function buildProcLevel(
   id: number,
@@ -223,22 +271,32 @@ function buildProcLevel(
   const grid: string[] = colorGrid.map(row => row.join(""));
   pruneFloaters(grid, cols);
 
-  // Sprinkle possums into deeper surviving cells.
+  // Scatter possums across the full grid so kids get early wins.
+  // At least 20% go in the bottom half (closer to the shooter = popped first),
+  // the rest in the top half, with at least one in the very top row.
   const cells: Array<[number, number]> = [];
   grid.forEach((row, r) =>
     row.split("").forEach((ch, c) => { if (ch !== ".") cells.push([r, c]); })
   );
-  cells.sort((a, b) => b[0] - a[0]);
-  const deepPool = cells.slice(0, Math.floor(cells.length * 0.6));
-  for (let p = 0; p < possumCount && deepPool.length; p++) {
-    const idx = Math.floor(rand() * deepPool.length);
-    const [r, c] = deepPool.splice(idx, 1)[0];
+  const midRow = Math.floor(rows / 2);
+  const bottomCells = cells.filter(([r]) => r >= midRow);
+  const topCells = cells.filter(([r]) => r < midRow);
+  const bottomCount = Math.max(1, Math.ceil(possumCount * 0.2));
+  const topCount = possumCount - bottomCount;
+  const placed = new Set<string>();
+  const placePossum = (pool: Array<[number, number]>) => {
+    if (!pool.length) return;
+    const idx = Math.floor(rand() * pool.length);
+    const [r, c] = pool.splice(idx, 1)[0];
     const arr = grid[r].split("");
     arr[c] = arr[c].toUpperCase();
     grid[r] = arr.join("");
-  }
+    placed.add(`${r},${c}`);
+  };
+  for (let i = 0; i < bottomCount; i++) placePossum(bottomCells);
+  for (let i = 0; i < topCount; i++) placePossum(topCells.length ? topCells : bottomCells);
 
-  ensurePossumInLastRow(grid);
+  ensurePossumInTopRow(grid);
 
   // Recompute used colors for accurate shooter palette.
   const finalUsed = new Set<BubbleColor>();
@@ -268,9 +326,9 @@ function generateAll(): LevelConfig[] {
     const idxInStage = lvlId - stage.range[0]; // 0..9
     const globalDifficulty = (lvlId - 6) / (FINAL_LEVEL_ID - 6); // 0..1
 
-    // Rows: gentle ramp inside each stage, plus overall growth.
-    const baseRows = 12 + Math.floor(globalDifficulty * 10); // 12..22
-    const rows = Math.min(26, baseRows + Math.floor(idxInStage * 0.6));
+    // Rows: gentle ramp — keep grids small so kids aren't overwhelmed.
+    const baseRows = 8 + Math.floor(globalDifficulty * 8); // 8..16
+    const rows = Math.min(20, baseRows + Math.floor(idxInStage * 0.4));
 
     // Palette: stage flavour + extra colors as game progresses.
     const extraColors = Math.min(2, Math.floor(globalDifficulty * 3));
@@ -281,18 +339,19 @@ function generateAll(): LevelConfig[] {
     }
     const palette = Array.from(paletteSet);
 
-    const possumCount = 3 + Math.floor(globalDifficulty * 9) + Math.floor(idxInStage / 4);
-    const shots = Math.max(20, Math.round(rows * 1.5 - globalDifficulty * 4));
+    // Fewer possums so kids can focus; generous shots so they always have a chance.
+    const possumCount = 2 + Math.floor(globalDifficulty * 5) + Math.floor(idxInStage / 5);
+    const shots = Math.max(22, Math.round(rows * 2.0 - globalDifficulty * 2));
 
-    // Boss level: bigger, all colors, lots of possums.
+    // Boss level: a bit bigger but still kid-friendly, all colors.
     if (lvlId === FINAL_LEVEL_ID) {
       out.push(buildProcLevel(
         lvlId,
         stage.levelNames[idxInStage],
-        26,
+        18,
         BUBBLE_COLORS,
-        16,
-        38,
+        8,
+        40,
         0, // spider web for the finale
         9999,
       ));
@@ -346,17 +405,16 @@ function pruneFloaters(grid: string[], cols: number) {
 }
 
 /**
- * Guarantee at least one trapped possum in the deepest row that contains
- * bubbles — every level should reward the player with a rescue at the bottom.
+ * Guarantee at least one trapped possum in the TOP row that contains
+ * bubbles — every level's final rescue goal is clearing up to the top.
  * If the row already has an uppercase (possum) char this is a no-op.
  */
-function ensurePossumInLastRow(grid: string[]) {
-  for (let r = grid.length - 1; r >= 0; r--) {
+function ensurePossumInTopRow(grid: string[]) {
+  for (let r = 0; r < grid.length; r++) {
     const row = grid[r];
     if (row.replace(/[. ]/g, "").length === 0) continue;
     if (/[A-Z]/.test(row)) return;
     const arr = row.split("");
-    // Prefer a centre-ish bubble so it feels like a deliberate placement.
     const indices: number[] = [];
     arr.forEach((ch, i) => { if (ch !== "." && ch !== " ") indices.push(i); });
     const target = indices[Math.floor(indices.length / 2)];
@@ -367,7 +425,7 @@ function ensurePossumInLastRow(grid: string[]) {
 }
 
 // Apply the guarantee to handcrafted Stage 1 too.
-for (const lvl of HANDCRAFTED_STAGE1) ensurePossumInLastRow(lvl.grid);
+for (const lvl of HANDCRAFTED_STAGE1) ensurePossumInTopRow(lvl.grid);
 
 export const LEVELS: LevelConfig[] = [...HANDCRAFTED_STAGE1, ...generateAll()];
 

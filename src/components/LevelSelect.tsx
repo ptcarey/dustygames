@@ -3,6 +3,7 @@ import { LEVELS } from "@/game/levels";
 import { STAGES, FINAL_LEVEL_ID } from "@/game/stages";
 import { Sfx } from "@/game/sound";
 import { StageDecor } from "./StageDecor";
+import { loadSave, getTotalStars } from "@/game/storage";
 
 interface Props {
   unlocked: number;
@@ -22,8 +23,10 @@ interface Props {
 export function LevelSelect({ unlocked, lastPlayed, onSelect, onBack }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
+  const save = loadSave();
+  const starMap = save.stars ?? {};
+  const totalStars = getTotalStars();
 
-  // Highlight the level the player most recently entered (or the highest unlocked as fallback).
   const focusLevel = lastPlayed && lastPlayed >= 1 ? lastPlayed : unlocked;
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function LevelSelect({ unlocked, lastPlayed, onSelect, onBack }: Props) {
           ← Back
         </button>
         <h2 className="text-xl font-bold text-foreground">Adventure Map</h2>
-        <div className="w-16" />
+        <span className="text-sm font-bold text-yellow-600">⭐ {totalStars}</span>
       </div>
 
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto">
@@ -75,6 +78,7 @@ export function LevelSelect({ unlocked, lastPlayed, onSelect, onBack }: Props) {
                 focusLevel={focusLevel}
                 onSelect={onSelect}
                 activeRef={activeRef}
+                starMap={starMap}
               />
               </div>
             </section>
@@ -92,6 +96,7 @@ interface StagePathProps {
   focusLevel: number;
   onSelect: (id: number) => void;
   activeRef: React.RefObject<HTMLButtonElement>;
+  starMap: Record<number, number>;
 }
 
 /**
@@ -99,7 +104,7 @@ interface StagePathProps {
  * Stamps zig-zag left-right to feel hand-drawn. The connecting line is an
  * SVG curve drawn behind the stamps.
  */
-function StagePath({ stage, levels, unlocked, focusLevel, onSelect, activeRef }: StagePathProps) {
+function StagePath({ stage, levels, unlocked, focusLevel, onSelect, activeRef, starMap }: StagePathProps) {
   const STAMP = 64;            // px size of each level stamp
   const ROW_HEIGHT = 86;       // vertical spacing between stamps
   const WIDTH_PCT = 70;        // horizontal swing width (% of container)
@@ -187,6 +192,11 @@ function StagePath({ stage, levels, unlocked, focusLevel, onSelect, activeRef }:
             <div className="mt-1 max-w-[110px] text-center text-[10px] font-semibold leading-tight text-foreground/90 drop-shadow">
               {lvl.name}
             </div>
+            {!locked && starMap[lvl.id] != null && (
+              <div className="text-[10px] leading-none">
+                {"⭐".repeat(starMap[lvl.id])}{"☆".repeat(3 - starMap[lvl.id])}
+              </div>
+            )}
           </button>
         );
       })}

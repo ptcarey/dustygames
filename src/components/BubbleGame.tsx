@@ -3,19 +3,23 @@ import {
   buildLevel, chainScore, findColorCluster, findFloaters,
   pickShooterColor, snapToGrid,
 } from "@/game/engine";
-import type { GridState } from "@/game/engine";
+import { neighborsOf, type GridState } from "@/game/engine";
 import { COLOR_HSL } from "@/game/types";
 import type { Bubble, BubbleColor, LevelConfig } from "@/game/types";
-import { Sfx, setSoundEnabled, unlockAudio } from "@/game/sound";
+import { Sfx, setSoundEnabled, isSoundEnabled, unlockAudio, startMusic, stopMusic } from "@/game/sound";
 import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
 import { getCharacterById, getCompanionForLevel } from "@/characters/characters";
-import { setActiveCharacterId } from "@/game/storage";
+import { setActiveCharacterId, setStars, addPossumsRescued, setBestShots, useHint, getHintsRemaining, isColorblindMode, setAudioEnabled } from "@/game/storage";
 import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
 import { FarewellScreen } from "./FarewellScreen";
+import { PhotoAlbum } from "./PhotoAlbum";
 import type { Character } from "@/game/types";
+import { stageForLevel } from "@/game/stages";
+import { CB_PATTERNS } from "@/game/colorblind";
+import { checkAchievements, type Achievement } from "@/game/achievements";
 
 interface Props {
   level: LevelConfig;
@@ -26,6 +30,7 @@ interface Props {
   onExit: () => void;
   onMenu: () => void;
   onFarewell?: (character: Character) => void;
+  practiceMode?: boolean;
 }
 
 interface SavedPossum { id: number; x: number; y: number; born: number; }
@@ -33,7 +38,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; color: Bubble
 
 const SHOOT_SPEED = 900; // px/sec
 
-export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu, onFarewell }: Props) {
+export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit, onMenu, onFarewell, practiceMode = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -76,6 +81,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     rafId: number;
     scrollY: number;       // current rendered offset (animated)
     targetScrollY: number; // computed each step
+    entranceT: number;     // 0..1 grid entrance animation progress (1 = done)
+    trailParticles: Array<{ x: number; y: number; born: number; color: BubbleColor; size: number }>;
 }>({
     grid: null,
     canvasW: 0, canvasH: 0, dpr: 1,
@@ -86,6 +93,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     popping: [], falling: [], savedPossums: [], particles: [],
     lastTs: 0, rafId: 0,
     scrollY: 0, targetScrollY: 0,
+    entranceT: 0, trailParticles: [],
   });
 
   const [shotsLeft, setShotsLeft] = useState(level.shots);
@@ -95,6 +103,18 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   const [overlay, setOverlay] = useState<"win" | "lose" | null>(null);
   const [ballColor, setBallColor] = useState<BubbleColor>("red");
   const [nextBallColor, setNextBallColor] = useState<BubbleColor>("blue");
+  const [comboText, setComboText] = useState<{ text: string; key: number } | null>(null);
+  const [earnedStars, setEarnedStars] = useState(0);
+  const [achievementToast, setAchievementToast] = useState<Achievement | null>(null);
+  const [colorblind] = useState(() => isColorblindMode());
+  const [hintsLeft, setHintsLeft] = useState(() => getHintsRemaining());
+  const [showHint, setShowHint] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const totalShotsRef = useRef(0);
+  const totalPopsRef = useRef(0);
+  const maxComboRef = useRef(0);
+  const missCountRef = useRef(0);
+  const possumsRescuedRef = useRef(0);
 
   // The active companion (if any) is fully data-driven — derived from the
   // character config's `availability.levels` range. A null companion means
@@ -181,18 +201,27 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     s.projectile = null;
     s.popping = []; s.falling = []; s.savedPossums = []; s.particles = [];
     s.scrollY = 0; s.targetScrollY = 0;
+    s.entranceT = 0; s.trailParticles = [];
 
     setShotsLeft(level.shots);
     setScore(0);
     setPossumsLeft(grid.bubbles.filter(b => b.hasPossum).length);
     setOverlay(null);
-    // Reset companion-related state — pop counter resets per level, and
-    // the active thrower returns to Dusty so the companion must be
-    // re-earned.
+    setComboText(null);
+    setEarnedStars(0);
+    totalShotsRef.current = level.shots;
+    totalPopsRef.current = 0;
+    maxComboRef.current = 0;
+    missCountRef.current = 0;
+    possumsRescuedRef.current = 0;
     setPopOrDropCount(0);
     setCompanionCooldownBaseline(null);
     setActiveCharacterId("dusty");
     setActiveThrowerIdState("dusty");
+
+    const stage = stageForLevel(level.id);
+    const stageIdx = stage ? Math.floor((level.id - 1) / 10) : 0;
+    startMusic(stageIdx);
   }, [level]);
 
   useEffect(() => {
@@ -214,13 +243,31 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       ctxState.rafId = requestAnimationFrame(tick);
     };
     ctxState.rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(ctxState.rafId);
+    return () => { cancelAnimationFrame(ctxState.rafId); stopMusic(); };
   }, []);
 
   const step = (dt: number) => {
     const s = stateRef.current;
     const grid = s.grid;
     if (!grid) return;
+
+    // Grid entrance cascade animation
+    if (s.entranceT < 1) {
+      s.entranceT = Math.min(1, s.entranceT + dt * 1.8);
+    }
+
+    // Trail particles behind projectile
+    if (s.projectile) {
+      s.trailParticles.push({
+        x: s.projectile.x + (Math.random() - 0.5) * 4,
+        y: s.projectile.y + (Math.random() - 0.5) * 4,
+        born: performance.now(),
+        color: s.projectile.color,
+        size: 2 + Math.random() * 2,
+      });
+    }
+    const trailNow = performance.now();
+    s.trailParticles = s.trailParticles.filter(p => trailNow - p.born < 300);
 
     // Visible window is capped at 15 rows. If the stack is taller than that,
     // anchor the BOTTOM of the stack to the bottom of the visible window so
@@ -249,12 +296,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       const p = s.projectile;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (p.x < grid.radius) {
-        p.x = grid.radius; p.vx = -p.vx;
+      const wallL = grid.radius + 1;
+      const wallR = s.canvasW - grid.radius - 1;
+      if (p.x < wallL) {
+        p.x = wallL + (wallL - p.x); p.vx = Math.abs(p.vx);
         if (p.zigzag) p.zigzag.dir = (p.zigzag.dir === 1 ? -1 : 1);
       }
-      if (p.x > s.canvasW - grid.radius) {
-        p.x = s.canvasW - grid.radius; p.vx = -p.vx;
+      if (p.x > wallR) {
+        p.x = wallR - (p.x - wallR); p.vx = -Math.abs(p.vx);
         if (p.zigzag) p.zigzag.dir = (p.zigzag.dir === 1 ? -1 : 1);
       }
 
@@ -362,22 +411,44 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     let { row, col } = snapToGrid(grid, p.x, p.y - s.scrollY);
     const occupied = new Set(grid.bubbles.map(b => `${b.row},${b.col}`));
     if (occupied.has(`${row},${col}`)) {
-      const candidates: Array<[number, number]> = [
-        [row, col + 1], [row, col - 1], [row + 1, col], [row - 1, col],
-      ];
-      for (const [r, c] of candidates) {
-        if (!occupied.has(`${r},${c}`)) { row = r; col = c; break; }
+      const hexNbrs = neighborsOf(row, col);
+      let best: [number, number] | null = null;
+      let bestDist = Infinity;
+      for (const [r, c] of hexNbrs) {
+        if (r < 0 || c < 0 || c >= grid.cols - (r % 2 === 1 ? 1 : 0)) continue;
+        if (occupied.has(`${r},${c}`)) continue;
+        const bx = grid.colX(r, c), by = grid.rowY(r);
+        const d = (bx - p.x) ** 2 + (by - (p.y - s.scrollY)) ** 2;
+        if (d < bestDist) { bestDist = d; best = [r, c]; }
       }
+      if (best) { row = best[0]; col = best[1]; }
     }
     row = Math.max(0, row);
-    col = Math.max(0, Math.min(grid.cols - 1, col));
+    col = Math.max(0, Math.min(grid.cols - (row % 2 === 1 ? 2 : 1), col));
+
+    // Power-up: "rainbow" color matches the best adjacent color
+    let landColor = p.color;
+    if (landColor === ("rainbow" as BubbleColor)) {
+      const nbrs = neighborsOf(row, col);
+      const nbrBubbles = nbrs
+        .map(([r, c]) => grid.bubbles.find(b => b.row === r && b.col === c))
+        .filter(Boolean) as Bubble[];
+      const colorCounts = new Map<BubbleColor, number>();
+      for (const nb of nbrBubbles) {
+        colorCounts.set(nb.color, (colorCounts.get(nb.color) ?? 0) + 1);
+      }
+      let best: BubbleColor = nbrBubbles[0]?.color ?? p.color;
+      let bestCount = 0;
+      for (const [c, n] of colorCounts) { if (n > bestCount) { best = c; bestCount = n; } }
+      landColor = best;
+    }
 
     const newBubble: Bubble = {
       id: Math.floor(Math.random() * 1e9),
       row, col,
       x: grid.colX(row, col),
       y: grid.rowY(row),
-      color: p.color,
+      color: landColor,
       hasPossum: false,
     };
     grid.bubbles.push(newBubble);
@@ -572,12 +643,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     grid.bubbles = grid.bubbles.filter(b => !ids.has(b.id));
 
     let chainTotal = 0;
+    let rescuedThisChain = 0;
     cluster.forEach((b, i) => {
       chainTotal += (i + 1) * 10;
-      // Popping is purely visual; bake current scrollY into screen position
       const px = b.x, py = b.y + s.scrollY;
       s.popping.push({ ...b, y: py, popStart: performance.now() + i * 30 });
-      // Spawn explosion particles
       const pieces = 8;
       for (let k = 0; k < pieces; k++) {
         const ang = (Math.PI * 2 * k) / pieces + Math.random() * 0.4;
@@ -597,8 +667,20 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         s.savedPossums.push({ id: b.id, x: b.x, y: b.y + s.scrollY, born: performance.now() });
         setPossumsLeft(pl => Math.max(0, pl - 1));
         setTimeout(() => Sfx.squeak(), i * 40 + 60);
+        rescuedThisChain++;
       }
     });
+
+    totalPopsRef.current += cluster.length;
+    possumsRescuedRef.current += rescuedThisChain;
+    if (cluster.length > maxComboRef.current) maxComboRef.current = cluster.length;
+
+    if (cluster.length >= 4) {
+      Sfx.combo(cluster.length);
+      setComboText({ text: cluster.length >= 8 ? `MEGA ${cluster.length}x!` : `${cluster.length}x Combo!`, key: Date.now() });
+      setTimeout(() => setComboText(null), 1200);
+    }
+
     setScore(sc => sc + chainTotal);
     flashHappy();
 
@@ -623,12 +705,21 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     tickAfterShot(true);
   };
 
+  const shotCounterRef = useRef(0);
   const tickAfterShot = (popped: boolean) => {
     const s = stateRef.current;
+    shotCounterRef.current++;
     s.currentColor = s.nextColor;
-    s.nextColor = pickShooterColor(s.grid!, level);
+    // Every 8th shot is a rainbow power-up
+    if (shotCounterRef.current % 8 === 7) {
+      s.nextColor = "rainbow" as BubbleColor;
+      Sfx.powerUp();
+    } else {
+      s.nextColor = pickShooterColor(s.grid!, level);
+    }
     setBallColor(s.currentColor);
     setNextBallColor(s.nextColor);
+    if (!popped) missCountRef.current++;
 
     setShotsLeft(prev => {
       const next = prev - 1;
@@ -644,7 +735,29 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     const remainingPossums = grid.bubbles.filter(b => b.hasPossum).length
       + s.falling.filter(b => b.hasPossum).length;
     if (remainingPossums === 0) {
+      stopMusic();
       Sfx.win();
+      const shotsUsed = totalShotsRef.current - shots;
+      const pct = shots / totalShotsRef.current;
+      const stars = pct >= 0.5 ? 3 : pct >= 0.2 ? 2 : 1;
+      setEarnedStars(stars);
+      setStars(level.id, stars);
+      setBestShots(level.id, shotsUsed);
+      addPossumsRescued(possumsRescuedRef.current);
+      setTimeout(() => Sfx.star(), 300);
+      const newAchievements = checkAchievements({
+        totalPops: totalPopsRef.current,
+        comboSize: maxComboRef.current,
+        levelId: level.id,
+        levelWon: true,
+        shotsUsed: missCountRef.current,
+        totalShots: totalShotsRef.current - shots,
+        usedCompanion: companionOnThisLevel && popOrDropCount > 0,
+      });
+      if (newAchievements.length > 0) {
+        setAchievementToast(newAchievements[0]);
+        setTimeout(() => setAchievementToast(null), 3000);
+      }
       setOverlay("win");
       onWinRef.current(scoreRef.current);
       if (companion && companion.availability && level.id === companion.availability.levels.to) {
@@ -653,9 +766,14 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       return;
     }
     if (shots <= 0 && !s.projectile) {
-      Sfx.lose();
-      setOverlay("lose");
-      onLoseRef.current();
+      if (practiceMode) {
+        setShotsLeft(5);
+      } else {
+        stopMusic();
+        Sfx.lose();
+        setOverlay("lose");
+        onLoseRef.current();
+      }
     }
   };
 
@@ -693,10 +811,25 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       drawAimGuide(ctx, s);
     }
 
-    // Render grid bubbles with scroll offset
+    // Render grid bubbles with scroll offset + entrance cascade
     ctx.save();
     ctx.translate(0, s.scrollY);
-    for (const b of grid.bubbles) drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+    for (const b of grid.bubbles) {
+      if (s.entranceT < 1) {
+        const delay = b.row * 0.06 + b.col * 0.015;
+        const t = Math.max(0, Math.min(1, (s.entranceT - delay) * 3));
+        if (t <= 0) continue;
+        ctx.save();
+        ctx.globalAlpha = t;
+        ctx.translate(b.x, b.y);
+        const sc = 0.3 + t * 0.7;
+        ctx.scale(sc, sc);
+        drawBubble(ctx, 0, 0, b.color, b.hasPossum);
+        ctx.restore();
+      } else {
+        drawBubble(ctx, b.x, b.y, b.color, b.hasPossum);
+      }
+    }
     ctx.restore();
 
     // Falling/popping already have screen coords
@@ -749,6 +882,45 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       ctx.restore();
     }
 
+    // Hint highlight — pulsing ring around the best target
+    if (showHint && grid.bubbles.length > 0) {
+      const colorGroups = new Map<string, Bubble[]>();
+      for (const b of grid.bubbles) {
+        const cluster = findColorCluster(grid, b);
+        const key = cluster.map(c => c.id).sort().join(",");
+        if (!colorGroups.has(key)) colorGroups.set(key, cluster);
+      }
+      let bestCluster: Bubble[] = [];
+      for (const cluster of colorGroups.values()) {
+        if (cluster.length > bestCluster.length) bestCluster = cluster;
+      }
+      if (bestCluster.length > 0) {
+        const pulse = 0.5 + Math.sin(now * 0.006) * 0.3;
+        ctx.save();
+        ctx.translate(0, s.scrollY);
+        for (const b of bestCluster) {
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, grid.radius + 4, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 200, 0, ${pulse})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    // Trail particles
+    for (const tp of s.trailParticles) {
+      const age = (now - tp.born) / 300;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 0.5 - age * 0.5);
+      ctx.fillStyle = COLOR_HSL[tp.color];
+      ctx.beginPath();
+      ctx.arc(tp.x, tp.y, tp.size * (1 - age * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     if (s.projectile) {
       if (s.projectile.loveBomb) {
         drawHeart(ctx, s.projectile.x, s.projectile.y, s.grid!.diameter);
@@ -767,57 +939,35 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     ctx: CanvasRenderingContext2D,
     x: number, y: number, diameter: number,
   ) => {
-    // Round, bubbly heart built from two circular lobes + a soft V tail.
-    // Sized to fit within a single bubble's bounding box.
-    const r = diameter * 0.5;          // overall bounding radius
-    const lobeR = r * 0.55;            // each top lobe is a fat circle
-    const lobeOffsetX = r * 0.42;      // horizontal lobe spacing
-    const lobeOffsetY = -r * 0.18;     // lift the lobes above centre
-    const tailY = r * 0.78;            // bottom tip of the heart
+    const r = diameter * 0.42;
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(x, y - r * 0.1);
     ctx.beginPath();
-    // Start at right side where right lobe meets the descending curve.
-    ctx.moveTo(lobeOffsetX + lobeR, lobeOffsetY);
-    // Right lobe — full circle arc across the top.
-    ctx.arc(lobeOffsetX, lobeOffsetY, lobeR, 0, Math.PI, true);
-    // Soft dip between the lobes (slightly raised so the lobes read as
-    // two plump bubbles rather than a single blob).
-    ctx.quadraticCurveTo(0, lobeOffsetY + lobeR * 0.35, -lobeOffsetX - lobeR, lobeOffsetY);
-    // Left lobe.
-    ctx.arc(-lobeOffsetX, lobeOffsetY, lobeR, Math.PI, 0, true);
-    // Right side curving down to the tail tip — bulges outward for that
-    // bubbly silhouette before tapering to a soft point.
-    ctx.bezierCurveTo(
-      lobeOffsetX + lobeR * 1.05, lobeOffsetY + lobeR * 0.9,
-      r * 0.55,                   tailY * 0.55,
-      0,                          tailY,
-    );
-    // Left side mirror back up to the starting lobe.
-    ctx.bezierCurveTo(
-      -r * 0.55,                   tailY * 0.55,
-      -lobeOffsetX - lobeR * 1.05, lobeOffsetY + lobeR * 0.9,
-      -lobeOffsetX - lobeR,        lobeOffsetY,
-    );
+    ctx.moveTo(0, r * 0.9);
+    ctx.bezierCurveTo(-r * 0.2, r * 0.6, -r * 1.1, r * 0.1, -r * 0.6, -r * 0.5);
+    ctx.bezierCurveTo(-r * 0.3, -r * 0.9, 0, -r * 0.7, 0, -r * 0.3);
+    ctx.bezierCurveTo(0, -r * 0.7, r * 0.3, -r * 0.9, r * 0.6, -r * 0.5);
+    ctx.bezierCurveTo(r * 1.1, r * 0.1, r * 0.2, r * 0.6, 0, r * 0.9);
     ctx.closePath();
-    // Glossy bubble-style fill.
     const grad = ctx.createRadialGradient(
-      -r * 0.25, -r * 0.30, r * 0.05,
-      0,         r * 0.10,  r * 0.95,
+      -r * 0.2, -r * 0.25, r * 0.05,
+      0, 0, r * 1.1,
     );
-    grad.addColorStop(0,    "hsl(340, 100%, 95%)");
-    grad.addColorStop(0.45, "hsl(340, 90%, 68%)");
-    grad.addColorStop(1,    "hsl(345, 80%, 48%)");
+    grad.addColorStop(0, "hsl(345, 100%, 88%)");
+    grad.addColorStop(0.4, "hsl(348, 85%, 62%)");
+    grad.addColorStop(1, "hsl(350, 75%, 50%)");
     ctx.fillStyle = grad;
     ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "hsl(345, 70%, 35%)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "hsl(350, 60%, 40%)";
     ctx.stroke();
-    // Sparkle highlight on the left lobe.
     ctx.beginPath();
-    ctx.ellipse(-lobeOffsetX * 0.85, lobeOffsetY - lobeR * 0.25,
-                lobeR * 0.32, lobeR * 0.18, -0.5, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.ellipse(-r * 0.28, -r * 0.38, r * 0.18, r * 0.12, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.12, -r * 0.25, r * 0.08, r * 0.06, -0.3, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.fill();
     ctx.restore();
   };
@@ -827,30 +977,81 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     x: number, y: number, color: BubbleColor, possum: boolean, scale = 1,
   ) => {
     const r = (stateRef.current.grid?.radius ?? 15) * scale;
-    const grad = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
-    grad.addColorStop(0, "rgba(255,255,255,0.95)");
-    grad.addColorStop(0.4, COLOR_HSL[color]);
-    grad.addColorStop(1, COLOR_HSL[color]);
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.18)";
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.beginPath(); ctx.ellipse(x - r * 0.35, y - r * 0.45, r * 0.3, r * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+    const isRainbow = (color as string) === "rainbow";
+    if (isRainbow) {
+      const rainbow = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+      rainbow.addColorStop(0, "hsl(0,85%,65%)");
+      rainbow.addColorStop(0.25, "hsl(48,95%,60%)");
+      rainbow.addColorStop(0.5, "hsl(140,65%,55%)");
+      rainbow.addColorStop(0.75, "hsl(210,90%,65%)");
+      rainbow.addColorStop(1, "hsl(280,70%,68%)");
+      ctx.fillStyle = rainbow;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.font = `${r}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🌈", x, y + 1);
+    } else {
+      const grad = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
+      grad.addColorStop(0, "rgba(255,255,255,0.95)");
+      grad.addColorStop(0.4, COLOR_HSL[color]);
+      grad.addColorStop(1, COLOR_HSL[color]);
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.18)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath(); ctx.ellipse(x - r * 0.35, y - r * 0.45, r * 0.3, r * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    if (colorblind && CB_PATTERNS[color]) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = "rgba(0,0,0,0.7)";
+      ctx.lineWidth = 1.5;
+      CB_PATTERNS[color](ctx, r);
+      ctx.restore();
+    }
 
     if (possum) {
       ctx.save();
       ctx.translate(x, y + 2);
       ctx.scale(0.55 * scale, 0.55 * scale);
-      ctx.fillStyle = "hsl(220 12% 55%)";
-      ctx.beginPath(); ctx.arc(-13, -12, 5, 0, Math.PI * 2); ctx.arc(13, -12, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(0, 0, 18, 15, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "hsl(35 40% 88%)";
-      ctx.beginPath(); ctx.ellipse(0, 6, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
+      // Ringtail possum: grey-brown fur, large round eyes, pointed snout, pink inner ears, curled tail
+      const fur = "hsl(30 20% 45%)";
+      const belly = "hsl(40 30% 82%)";
+      // Pointed ears
+      ctx.fillStyle = fur;
+      ctx.beginPath(); ctx.moveTo(-14, -6); ctx.lineTo(-10, -18); ctx.lineTo(-6, -6); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(14, -6); ctx.lineTo(10, -18); ctx.lineTo(6, -6); ctx.closePath(); ctx.fill();
+      // Pink inner ears
+      ctx.fillStyle = "hsl(340 60% 75%)";
+      ctx.beginPath(); ctx.moveTo(-13, -7); ctx.lineTo(-10, -15); ctx.lineTo(-7, -7); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(13, -7); ctx.lineTo(10, -15); ctx.lineTo(7, -7); ctx.closePath(); ctx.fill();
+      // Head
+      ctx.fillStyle = fur;
+      ctx.beginPath(); ctx.ellipse(0, 0, 16, 13, 0, 0, Math.PI * 2); ctx.fill();
+      // Lighter face patch
+      ctx.fillStyle = belly;
+      ctx.beginPath(); ctx.ellipse(0, 4, 9, 7, 0, 0, Math.PI * 2); ctx.fill();
+      // Large round eyes (ringtail possums have big dark eyes)
       ctx.fillStyle = "#1a1a1a";
-      ctx.beginPath(); ctx.arc(-6, -2, 2.2, 0, Math.PI * 2); ctx.arc(6, -2, 2.2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(0, 3, 1.5, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-5.5, -2, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(5.5, -2, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "white";
+      ctx.beginPath(); ctx.arc(-4.8, -3, 1.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(6.2, -3, 1.1, 0, Math.PI * 2); ctx.fill();
+      // Small pointed nose
+      ctx.fillStyle = "#3a2a2a";
+      ctx.beginPath(); ctx.ellipse(0, 4, 1.8, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+      // Curled tail hint (small curl on right side)
+      ctx.strokeStyle = fur;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(16, 8, 5, -Math.PI * 0.5, Math.PI * 1.2); ctx.stroke();
       ctx.restore();
     }
   };
@@ -875,8 +1076,10 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     const grid = s.grid!;
     while (segments < 6 && remaining > 4 && y > 30) {
       let tWall = Infinity;
-      if (vx < 0) tWall = (grid.radius - x) / vx;
-      else if (vx > 0) tWall = (s.canvasW - grid.radius - x) / vx;
+      const guideWallL = grid.radius + 1;
+      const guideWallR = s.canvasW - grid.radius - 1;
+      if (vx < 0) tWall = (guideWallL - x) / vx;
+      else if (vx > 0) tWall = (guideWallR - x) / vx;
       let tHit = Infinity;
       for (const b of grid.bubbles) {
         const by = b.y + s.scrollY;
@@ -1055,7 +1258,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             onPointerDown={(e) => e.stopPropagation()}
             disabled={!companionAvailable || !!overlay || !!stateRef.current.projectile}
             aria-label={(() => {
-              if (companionAvailable) return `Swap to ${companion.name}`;
+              if (companionAvailable) return `Swap to ${getCharacterById(waitingCharacterId).name}`;
               const remaining = companionCooldownBaseline === null
                 ? Math.max(0, companionUnlockThreshold - popOrDropCount)
                 : Math.max(0, companionReactivateThreshold - (popOrDropCount - companionCooldownBaseline));
@@ -1075,7 +1278,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             </div>
             <span className="mt-0.5 text-[9px] font-bold leading-none text-foreground/80">
               {companionAvailable
-                ? `Tap ${companion.name}`
+                ? `Tap ${getCharacterById(waitingCharacterId).name}`
                 : `${
                     companionCooldownBaseline === null
                       ? Math.max(0, companionUnlockThreshold - popOrDropCount)
@@ -1083,6 +1286,25 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
                   } to go`}
             </span>
           </button>
+        )}
+
+        {/* Combo text overlay */}
+        {comboText && (
+          <div key={comboText.key} className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex justify-center animate-bounce-soft">
+            <span className="text-3xl font-black text-yellow-400 drop-shadow-lg" style={{ textShadow: "2px 2px 6px rgba(0,0,0,0.5)" }}>
+              {comboText.text}
+            </span>
+          </div>
+        )}
+
+        {/* Achievement toast */}
+        {achievementToast && (
+          <div className="pointer-events-none absolute top-14 inset-x-0 z-30 flex justify-center">
+            <div className="rounded-2xl bg-yellow-100/95 px-4 py-2 text-center shadow-xl backdrop-blur animate-bounce-soft">
+              <span className="text-lg">{achievementToast.icon}</span>
+              <span className="ml-2 text-sm font-bold text-yellow-900">{achievementToast.title}</span>
+            </div>
+          </div>
         )}
 
         {/* Current + next ball indicators next to Dusty. Tap the next ball to swap. */}
@@ -1121,12 +1343,48 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Shots</div>
             <div className="text-base font-bold leading-tight text-primary">{shotsLeft}</div>
           </div>
-          <div className="flex w-full items-center justify-center gap-1 rounded-xl bg-white/85 px-2 py-1 shadow-md backdrop-blur">
-            <svg width="16" height="16" viewBox="-22 -22 44 44">
-              <PossumFace />
-            </svg>
-            <span className="text-sm font-bold leading-none">{possumsLeft}</span>
+          <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Rescue</div>
+            <div className="flex items-center justify-center gap-1">
+              <svg width="14" height="14" viewBox="-22 -22 44 44">
+                <PossumFace />
+              </svg>
+              <span className="text-base font-bold leading-tight">{possumsLeft}</span>
+            </div>
           </div>
+          <button
+            onClick={() => {
+              if (hintsLeft <= 0) return;
+              if (useHint()) {
+                setHintsLeft(h => h - 1);
+                setShowHint(true);
+                Sfx.hint();
+                setTimeout(() => setShowHint(false), 2000);
+              }
+            }}
+            disabled={hintsLeft <= 0 || !!overlay}
+            className="w-full rounded-xl bg-yellow-100/90 px-2 py-1 text-center shadow-md backdrop-blur disabled:opacity-40"
+          >
+            <div className="text-[9px] uppercase tracking-wide text-yellow-800">Hint</div>
+            <div className="text-xs font-bold text-yellow-700">💡 {hintsLeft}</div>
+          </button>
+          <button
+            onClick={() => {
+              const next = !soundOn;
+              setSoundOn(next);
+              setSoundEnabled(next);
+              setAudioEnabled(next);
+            }}
+            className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur"
+            aria-label={soundOn ? "Mute sound" : "Unmute sound"}
+          >
+            <div className="text-base">{soundOn ? "🔊" : "🔇"}</div>
+          </button>
+          {practiceMode && (
+            <div className="w-full rounded-xl bg-green-100/90 px-1 py-0.5 text-center shadow-md backdrop-blur">
+              <div className="text-[8px] font-bold text-green-700">PRACTICE</div>
+            </div>
+          )}
           <Button
             variant="secondary"
             onClick={onMenu}
@@ -1165,16 +1423,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         companion && companion.availability && level.id === companion.availability.levels.to ? (
           <FarewellScreen character={companion} onContinue={onNext} />
         ) : level.id === 60 ? (
-          <Overlay
-            title="💖 Dusty found Matilda!"
-            subtitle={`Reunited at last! Final score: ${score}`}
-            ctaLabel="Back to Map"
-            onCta={onExit}
-          />
+          <PhotoAlbum onClose={onExit} />
         ) : (
           <Overlay
             title="🎉 You saved them all!"
-            subtitle={`Score: ${score}`}
+            subtitle={`Score: ${score}  ${"⭐".repeat(earnedStars)}${"☆".repeat(3 - earnedStars)}`}
             ctaLabel="Next Level →"
             onCta={onNext}
           />
