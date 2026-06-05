@@ -1346,7 +1346,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
             <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Rescue</div>
             <div className="flex items-center justify-center gap-1.5">
-              <svg width="20" height="20" viewBox="-22 -22 44 44">
+              <svg width="32" height="32" viewBox="-22 -22 44 44">
                 <PossumFace />
               </svg>
               <span className="text-base font-bold leading-tight">{possumsLeft}</span>
