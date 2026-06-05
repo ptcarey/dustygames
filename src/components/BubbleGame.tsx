@@ -1343,11 +1343,11 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Shots</div>
             <div className="text-base font-bold leading-tight text-primary">{shotsLeft}</div>
           </div>
-          <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
-            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Rescue</div>
-            <div className="flex items-center justify-center gap-1.5">
-              <svg width="32" height="32" viewBox="-22 -22 44 44">
-                <PossumFace />
+          <div className="w-full rounded-xl bg-white/85 px-2 py-1 shadow-md backdrop-blur">
+            <div className="text-center text-[9px] uppercase tracking-wide text-muted-foreground">Rescue</div>
+            <div className="flex items-center justify-center gap-1">
+              <svg width="22" height="22" viewBox="-20 -20 40 40" className="shrink-0">
+                <PossumFace cx={0} cy={0} scale={0.9} />
               </svg>
               <span className="text-base font-bold leading-tight">{possumsLeft}</span>
             </div>
