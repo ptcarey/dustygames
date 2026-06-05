@@ -1345,8 +1345,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           </div>
           <div className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur">
             <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Rescue</div>
-            <div className="flex items-center justify-center gap-1">
-              <svg width="14" height="14" viewBox="-22 -22 44 44">
+            <div className="flex items-center justify-center gap-1.5">
+              <svg width="20" height="20" viewBox="-22 -22 44 44">
                 <PossumFace />
               </svg>
               <span className="text-base font-bold leading-tight">{possumsLeft}</span>
@@ -1378,7 +1378,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
             className="w-full rounded-xl bg-white/85 px-2 py-1 text-center shadow-md backdrop-blur"
             aria-label={soundOn ? "Mute sound" : "Unmute sound"}
           >
-            <div className="text-base">{soundOn ? "🔊" : "🔇"}</div>
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Sound</div>
+            <div className="text-base leading-tight">{soundOn ? "🔊" : "🔇"}</div>
           </button>
           {practiceMode && (
             <div className="w-full rounded-xl bg-green-100/90 px-1 py-0.5 text-center shadow-md backdrop-blur">
