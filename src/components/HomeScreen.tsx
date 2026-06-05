@@ -31,77 +31,77 @@ export function HomeScreen({ onPlay, onLevels, onDailyChallenge, audioEnabled, o
   };
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-between p-6">
-      <div className="mt-6 text-center">
-        <h1 className="text-5xl font-bold text-foreground drop-shadow-sm sm:text-6xl">
+    <div className="flex h-full w-full flex-col items-center justify-between p-4 pb-3">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-foreground drop-shadow-sm sm:text-5xl">
           Dusty's Bubble Pop
         </h1>
-        <p className="mt-2 text-lg text-muted-foreground">Help Dusty rescue the possums and find his owner, Matilda</p>
+        <p className="mt-1 text-sm text-muted-foreground sm:text-base">Help Dusty rescue the possums and find his owner, Matilda</p>
       </div>
 
-      <div className="animate-float">
+      <div className="animate-float py-1">
         <img
           src={dustyAndMatilda}
           alt="Dusty the cavoodle hugging Matilda"
-          className="h-auto w-[260px] select-none drop-shadow-lg sm:w-[300px]"
+          className="h-auto w-[180px] select-none drop-shadow-lg sm:w-[240px]"
           draggable={false}
         />
       </div>
 
-      <div className="flex w-full max-w-xs flex-col items-stretch gap-4">
-        <button className="kid-button" onClick={click(onPlay)}>▶ Play</button>
-        {onDailyChallenge && (
-          <button className="kid-button" onClick={click(onDailyChallenge)} style={{ background: "linear-gradient(135deg, hsl(45 95% 55%), hsl(35 90% 50%))" }}>
-            📅 Daily Challenge
-          </button>
-        )}
-        <button className="kid-button kid-button-secondary" onClick={click(onLevels)}>Levels</button>
-        {onGallery && (
-          <button className="kid-button kid-button-secondary" onClick={click(onGallery)}>🐾 Possum Gallery</button>
-        )}
+      <div className="flex w-full max-w-xs flex-col items-stretch gap-2">
+        <button className="kid-button !py-2.5 !text-lg" onClick={click(onPlay)}>▶ Play</button>
 
-        <div className="flex items-center justify-between rounded-full bg-card/80 px-5 py-3 shadow-md backdrop-blur">
-          <span className="text-base font-semibold text-foreground">Sound</span>
+        <div className="flex gap-2">
+          {onDailyChallenge && (
+            <button
+              className="kid-button !py-2 !text-sm flex-1"
+              onClick={click(onDailyChallenge)}
+              style={{ background: "linear-gradient(135deg, hsl(45 95% 55%), hsl(35 90% 50%))" }}
+            >
+              📅 Daily
+            </button>
+          )}
+          <button className="kid-button kid-button-secondary !py-2 !text-sm flex-1" onClick={click(onLevels)}>Levels</button>
+        </div>
+
+        <div className="flex gap-2">
+          {onGallery && (
+            <button className="kid-button kid-button-secondary !py-2 !text-sm flex-1" onClick={click(onGallery)}>🐾 Gallery</button>
+          )}
+          {onAchievements && (
+            <button className="kid-button kid-button-secondary !py-2 !text-sm flex-1" onClick={click(onAchievements)}>
+              🏆 {earnedIds.size}/{ACHIEVEMENTS.length}
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center justify-center gap-3 rounded-2xl bg-card/80 px-3 py-2 shadow-md backdrop-blur">
           <button
             onClick={click(onToggleAudio)}
-            className="rounded-full bg-primary/15 px-4 py-1 text-base font-bold text-primary"
+            className="rounded-full bg-primary/15 px-3 py-1 text-sm font-bold text-primary"
             aria-label="Toggle sound"
           >
-            {audioEnabled ? "🔊 On" : "🔇 Off"}
+            {audioEnabled ? "🔊 Sound" : "🔇 Sound"}
           </button>
-        </div>
-
-        <div className="flex items-center justify-between rounded-full bg-card/80 px-5 py-3 shadow-md backdrop-blur">
-          <span className="text-base font-semibold text-foreground">Colorblind</span>
           <button
             onClick={toggleCb}
-            className="rounded-full bg-primary/15 px-4 py-1 text-base font-bold text-primary"
+            className="rounded-full bg-primary/15 px-3 py-1 text-sm font-bold text-primary"
             aria-label="Toggle colorblind mode"
           >
-            {cbMode ? "On" : "Off"}
+            {cbMode ? "👁 CB On" : "👁 CB"}
           </button>
-        </div>
-
-        {onTogglePractice && (
-          <div className="flex items-center justify-between rounded-full bg-card/80 px-5 py-3 shadow-md backdrop-blur">
-            <span className="text-base font-semibold text-foreground">Practice</span>
+          {onTogglePractice && (
             <button
               onClick={() => { Sfx.click(); onTogglePractice(); }}
-              className="rounded-full bg-primary/15 px-4 py-1 text-base font-bold text-primary"
+              className="rounded-full bg-primary/15 px-3 py-1 text-sm font-bold text-primary"
               aria-label="Toggle practice mode"
             >
-              {practiceMode ? "On" : "Off"}
+              {practiceMode ? "🎯 Prac" : "🎯 Prac"}
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
-        {onAchievements && (
-          <button className="kid-button kid-button-secondary" onClick={click(onAchievements)}>
-            🏆 Achievements ({earnedIds.size}/{ACHIEVEMENTS.length})
-          </button>
-        )}
-
-        <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
           {totalStars > 0 && <span>⭐ {totalStars} stars</span>}
           {highScore > 0 && <span>★ High score: {highScore}</span>}
         </div>
