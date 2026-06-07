@@ -1299,16 +1299,16 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
           </button>
         )}
 
-        {/* Supporter characters — visual-only, cheering from the side */}
+        {/* Supporter characters — visual-only, cheering from the left side */}
         {supporters.length > 0 && (
-          <div className="pointer-events-none absolute bottom-2 right-[76px] z-10 flex flex-col items-center gap-1">
+          <div className="pointer-events-none absolute bottom-2 left-2 z-10 flex flex-row items-end gap-1">
             {supporters.map(s => (
               <div key={s.id} className="flex flex-col items-center">
                 <img
                   src={s.spriteRef}
                   alt={s.name}
-                  width={56}
-                  height={80}
+                  width={48}
+                  height={68}
                   draggable={false}
                   className={`select-none drop-shadow-md ${overlay === "win" ? "animate-bounce-soft" : "animate-idle-breathe"}`}
                 />

@@ -9,6 +9,7 @@ import bellaSprite from "@/assets/bella.png";
 import teddySprite from "@/assets/teddy.png";
 import rubySprite from "@/assets/ruby.png";
 import emeliaSprite from "@/assets/emelia.png";
+import daisySprite from "@/assets/daisy.png";
 
 export const CHARACTERS: readonly Character[] = [
   {
@@ -84,7 +85,17 @@ export const CHARACTERS: readonly Character[] = [
       reactivation: { metric: "popOrDropInLevel", count: 6 },
     },
   },
-  { id: "daisy",  name: "Daisy",  themeColor: "hsl(50, 90%, 60%)",  spriteRef: "", abilityIds: [], cosmetics: [] },
+  {
+    id: "daisy",
+    name: "Daisy",
+    themeColor: "hsl(50, 90%, 60%)",
+    spriteRef: daisySprite,
+    abilityIds: [],
+    voiceLines: [],
+    backstory: "A bright and bubbly 6-year-old who loves cheering for her friends.",
+    cosmetics: [],
+    supporter: { levels: { from: 51, to: 60 } },
+  },
   {
     id: "emelia",
     name: "Emelia",
