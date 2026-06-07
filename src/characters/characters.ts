@@ -8,6 +8,7 @@ import willSprite from "@/assets/will.png";
 import bellaSprite from "@/assets/bella.png";
 import teddySprite from "@/assets/teddy.png";
 import rubySprite from "@/assets/ruby.png";
+import emeliaSprite from "@/assets/emelia.png";
 
 export const CHARACTERS: readonly Character[] = [
   {
@@ -84,7 +85,17 @@ export const CHARACTERS: readonly Character[] = [
     },
   },
   { id: "daisy",  name: "Daisy",  themeColor: "hsl(50, 90%, 60%)",  spriteRef: "", abilityIds: [], cosmetics: [] },
-  { id: "emelia", name: "Emelia", themeColor: "hsl(280, 60%, 65%)", spriteRef: "", abilityIds: [], cosmetics: [] },
+  {
+    id: "emelia",
+    name: "Emelia",
+    themeColor: "hsl(330, 75%, 70%)",
+    spriteRef: emeliaSprite,
+    abilityIds: [],
+    voiceLines: [],
+    backstory: "An adventurous 8-year-old who cheers Dusty on through the toughest levels.",
+    cosmetics: [],
+    supporter: { levels: { from: 51, to: 60 } },
+  },
   { id: "indy",   name: "Indy",   themeColor: "hsl(15, 80%, 55%)",  spriteRef: "", abilityIds: [], cosmetics: [] },
 ] as const;
 
@@ -99,4 +110,11 @@ export function getCompanionForLevel(levelId: number): Character | null {
   return CHARACTERS.find(
     c => c.availability && levelId >= c.availability.levels.from && levelId <= c.availability.levels.to
   ) ?? null;
+}
+
+/** Returns supporter characters (visual-only, no abilities) for a given level. */
+export function getSupportersForLevel(levelId: number): Character[] {
+  return CHARACTERS.filter(
+    c => c.supporter && levelId >= c.supporter.levels.from && levelId <= c.supporter.levels.to
+  );
 }

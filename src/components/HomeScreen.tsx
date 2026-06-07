@@ -96,7 +96,7 @@ export function HomeScreen({ onPlay, onLevels, onDailyChallenge, audioEnabled, o
               className="rounded-full bg-primary/15 px-3 py-1 text-sm font-bold text-primary"
               aria-label="Toggle practice mode"
             >
-              {practiceMode ? "🎯 Prac" : "🎯 Prac"}
+              🎯 {practiceMode ? "On" : "Prac"}
             </button>
           )}
         </div>

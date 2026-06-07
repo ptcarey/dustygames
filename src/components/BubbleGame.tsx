@@ -11,7 +11,7 @@ import { Dusty } from "./Dusty";
 import { PossumFace, BubbleSvg } from "./BubbleSvg";
 import { Button } from "./ui/button";
 import possumDanceImg from "@/assets/possum-dance.png";
-import { getCharacterById, getCompanionForLevel } from "@/characters/characters";
+import { getCharacterById, getCompanionForLevel, getSupportersForLevel } from "@/characters/characters";
 import { setActiveCharacterId, setStars, addPossumsRescued, setBestShots, useHint, getHintsRemaining, isColorblindMode, setAudioEnabled } from "@/game/storage";
 import { getProjectileBehaviorForAbilities, type ProjectileBehavior } from "@/abilities";
 import { FarewellScreen } from "./FarewellScreen";
@@ -109,6 +109,8 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   const [colorblind] = useState(() => isColorblindMode());
   const [hintsLeft, setHintsLeft] = useState(() => getHintsRemaining());
   const [showHint, setShowHint] = useState(false);
+  const showHintRef = useRef(false);
+  const hintClusterRef = useRef<Bubble[]>([]);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const totalShotsRef = useRef(0);
   const totalPopsRef = useRef(0);
@@ -121,6 +123,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
   // Dusty plays this level alone.
   const companion = useMemo(() => getCompanionForLevel(level.id), [level.id]);
   const companionOnThisLevel = companion !== null;
+  const supporters = useMemo(() => getSupportersForLevel(level.id), [level.id]);
   const companionUnlockThreshold = companion?.availability?.initialUnlock.count ?? 0;
   const companionReactivateThreshold = companion?.availability?.reactivation.count ?? 0;
   const [popOrDropCount, setPopOrDropCount] = useState(0);
@@ -214,6 +217,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     maxComboRef.current = 0;
     missCountRef.current = 0;
     possumsRescuedRef.current = 0;
+    shotCounterRef.current = 0;
     setPopOrDropCount(0);
     setCompanionCooldownBaseline(null);
     setActiveCharacterId("dusty");
@@ -222,6 +226,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     const stage = stageForLevel(level.id);
     const stageIdx = stage ? Math.floor((level.id - 1) / 10) : 0;
     startMusic(stageIdx);
+    needsRedrawRef.current = true;
   }, [level]);
 
   useEffect(() => {
@@ -231,15 +236,35 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     return () => window.removeEventListener("resize", onResize);
   }, [initLevel]);
 
+  const needsRedrawRef = useRef(true);
+  const markDirty = () => { needsRedrawRef.current = true; };
+
   useEffect(() => {
     const ctxState = stateRef.current;
     let last = performance.now();
+    let idleFrames = 0;
 
     const tick = (ts: number) => {
       const dt = Math.min(0.05, (ts - last) / 1000);
       last = ts;
-      step(dt);
-      draw();
+
+      const s = ctxState;
+      const isActive = !!s.projectile || s.popping.length > 0 ||
+        s.falling.length > 0 || s.particles.length > 0 ||
+        s.savedPossums.length > 0 || s.trailParticles.length > 0 ||
+        s.entranceT < 1 || s.aiming || showHintRef.current ||
+        Math.abs(s.targetScrollY - s.scrollY) > 0.5;
+
+      if (isActive || needsRedrawRef.current) {
+        step(dt);
+        draw();
+        needsRedrawRef.current = false;
+        idleFrames = 0;
+      } else {
+        idleFrames++;
+        if (idleFrames % 15 === 0) draw();
+      }
+
       ctxState.rafId = requestAnimationFrame(tick);
     };
     ctxState.rafId = requestAnimationFrame(tick);
@@ -733,7 +758,7 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     const grid = s.grid!;
     if (overlayRef.current) return;
     const remainingPossums = grid.bubbles.filter(b => b.hasPossum).length
-      + s.falling.filter(b => b.hasPossum).length;
+      + s.falling.filter(b => b.hasPossum && !b.landed).length;
     if (remainingPossums === 0) {
       stopMusic();
       Sfx.win();
@@ -882,31 +907,20 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
       ctx.restore();
     }
 
-    // Hint highlight — pulsing ring around the best target
-    if (showHint && grid.bubbles.length > 0) {
-      const colorGroups = new Map<string, Bubble[]>();
-      for (const b of grid.bubbles) {
-        const cluster = findColorCluster(grid, b);
-        const key = cluster.map(c => c.id).sort().join(",");
-        if (!colorGroups.has(key)) colorGroups.set(key, cluster);
+    // Hint highlight — pulsing ring around the cached best cluster
+    if (showHintRef.current && hintClusterRef.current.length > 0) {
+      const bestCluster = hintClusterRef.current;
+      const pulse = 0.5 + Math.sin(now * 0.006) * 0.3;
+      ctx.save();
+      ctx.translate(0, s.scrollY);
+      ctx.strokeStyle = `rgba(255, 200, 0, ${pulse})`;
+      ctx.lineWidth = 3;
+      for (const b of bestCluster) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, grid.radius + 4, 0, Math.PI * 2);
+        ctx.stroke();
       }
-      let bestCluster: Bubble[] = [];
-      for (const cluster of colorGroups.values()) {
-        if (cluster.length > bestCluster.length) bestCluster = cluster;
-      }
-      if (bestCluster.length > 0) {
-        const pulse = 0.5 + Math.sin(now * 0.006) * 0.3;
-        ctx.save();
-        ctx.translate(0, s.scrollY);
-        for (const b of bestCluster) {
-          ctx.beginPath();
-          ctx.arc(b.x, b.y, grid.radius + 4, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(255, 200, 0, ${pulse})`;
-          ctx.lineWidth = 3;
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+      ctx.restore();
     }
 
     // Trail particles
@@ -1215,9 +1229,6 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
     Sfx.shoot();
   };
 
-  const colorChip = useMemo(() => COLOR_HSL[stateRef.current.currentColor], []);
-  void colorChip;
-
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       {/* App chrome: level title bar — fully outside the bubble play area */}
@@ -1286,6 +1297,25 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
                   } to go`}
             </span>
           </button>
+        )}
+
+        {/* Supporter characters — visual-only, cheering from the side */}
+        {supporters.length > 0 && (
+          <div className="pointer-events-none absolute bottom-2 right-[76px] z-10 flex flex-col items-center gap-1">
+            {supporters.map(s => (
+              <div key={s.id} className="flex flex-col items-center">
+                <img
+                  src={s.spriteRef}
+                  alt={s.name}
+                  width={56}
+                  height={80}
+                  draggable={false}
+                  className={`select-none drop-shadow-md ${overlay === "win" ? "animate-bounce-soft" : "animate-idle-breathe"}`}
+                />
+                <span className="mt-0.5 text-[8px] font-bold text-foreground/70">{s.name}</span>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Combo text overlay */}
@@ -1357,9 +1387,24 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
               if (hintsLeft <= 0) return;
               if (useHint()) {
                 setHintsLeft(h => h - 1);
+                const grid = stateRef.current.grid;
+                if (grid) {
+                  const colorGroups = new Map<string, Bubble[]>();
+                  for (const b of grid.bubbles) {
+                    const cluster = findColorCluster(grid, b);
+                    const key = cluster.map(c => c.id).sort().join(",");
+                    if (!colorGroups.has(key)) colorGroups.set(key, cluster);
+                  }
+                  let best: Bubble[] = [];
+                  for (const cluster of colorGroups.values()) {
+                    if (cluster.length > best.length) best = cluster;
+                  }
+                  hintClusterRef.current = best;
+                }
+                showHintRef.current = true;
                 setShowHint(true);
                 Sfx.hint();
-                setTimeout(() => setShowHint(false), 2000);
+                setTimeout(() => { showHintRef.current = false; setShowHint(false); }, 2000);
               }
             }}
             disabled={hintsLeft <= 0 || !!overlay}

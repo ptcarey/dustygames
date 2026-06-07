@@ -39,6 +39,10 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
+        // Force the new SW to activate immediately on install so users never
+        // stay stuck on stale cached assets from a previous deployment.
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ].filter(Boolean),
