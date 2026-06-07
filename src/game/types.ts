@@ -81,7 +81,7 @@ export interface Character {
   cosmetics: string[];                  // ids of visual flourishes ("bowtie", "hat", "cape", etc.)
   availability?: CharacterAvailability; // optional — characters without a rule are always available on all levels
   /** Visual-only supporter: appears on-screen cheering during these levels but doesn't throw bubbles. */
-  supporter?: { levels: { from: number; to: number } };
+  supporter?: { levels: { from: number; to: number }; scale?: number };
 }
 
 export interface CharacterAvailability {

@@ -94,7 +94,7 @@ export const CHARACTERS: readonly Character[] = [
     voiceLines: [],
     backstory: "A bright and bubbly 6-year-old who loves cheering for her friends.",
     cosmetics: [],
-    supporter: { levels: { from: 51, to: 60 } },
+    supporter: { levels: { from: 51, to: 60 }, scale: 0.75 },
   },
   {
     id: "emelia",

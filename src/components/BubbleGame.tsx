@@ -1302,19 +1302,24 @@ export function BubbleGame({ level, audioEnabled, onWin, onLose, onNext, onExit,
         {/* Supporter characters — visual-only, cheering from the left side */}
         {supporters.length > 0 && (
           <div className="pointer-events-none absolute bottom-2 left-2 z-10 flex flex-row items-end gap-1">
-            {supporters.map(s => (
-              <div key={s.id} className="flex flex-col items-center">
-                <img
-                  src={s.spriteRef}
-                  alt={s.name}
-                  width={48}
-                  height={68}
-                  draggable={false}
-                  className={`select-none drop-shadow-md ${overlay === "win" ? "animate-bounce-soft" : "animate-idle-breathe"}`}
-                />
-                <span className="mt-0.5 text-[8px] font-bold text-foreground/70">{s.name}</span>
-              </div>
-            ))}
+            {supporters.map(s => {
+              const scale = s.supporter?.scale ?? 1;
+              const w = Math.round(48 * scale);
+              const h = Math.round(68 * scale);
+              return (
+                <div key={s.id} className="flex flex-col items-center">
+                  <img
+                    src={s.spriteRef}
+                    alt={s.name}
+                    width={w}
+                    height={h}
+                    draggable={false}
+                    className={`select-none drop-shadow-md ${overlay === "win" ? "animate-bounce-soft" : "animate-idle-breathe"}`}
+                  />
+                  <span className="mt-0.5 text-[8px] font-bold text-foreground/70">{s.name}</span>
+                </div>
+              );
+            })}
           </div>
         )}
 
